@@ -199,6 +199,20 @@
     return orderKeys.map(function (k) { return map.get(k); });
   }
 
+  // Build the option overrides sent to the bridge from popup settings. Only
+  // non-empty values are included so the server keeps its own defaults.
+  function buildBridgeOptions(settings) {
+    settings = settings || {};
+    var opts = {};
+    if (settings.noteMode) opts.note_mode = settings.noteMode;
+    if (settings.account) opts.account = settings.account;
+    if (settings.days !== "" && settings.days !== undefined && settings.days !== null) {
+      var d = parseInt(settings.days, 10);
+      if (!isNaN(d)) opts.days = d;
+    }
+    return opts;
+  }
+
   var ASFA = {
     CURRENCY_BY_HOST: CURRENCY_BY_HOST,
     currencyForHost: currencyForHost,
@@ -209,7 +223,8 @@
     CSV_HEADERS: CSV_HEADERS,
     csvEscape: csvEscape,
     ordersToCsv: ordersToCsv,
-    mergeOrders: mergeOrders
+    mergeOrders: mergeOrders,
+    buildBridgeOptions: buildBridgeOptions
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = ASFA;

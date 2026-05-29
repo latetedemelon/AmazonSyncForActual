@@ -84,6 +84,11 @@ class Config:
     note_prefix: str = ""
     max_length: int = 0
 
+    # --- Bridge (local HTTP companion for the browser extension) -----------
+    bridge_host: str = "127.0.0.1"
+    bridge_port: int = 5007
+    bridge_token: Optional[str] = None
+
     # --- Behaviour ---------------------------------------------------------
     dry_run: bool = False
     verbose: bool = False
@@ -107,15 +112,17 @@ class Config:
     def validate(self) -> List[str]:
         """Return a list of human-readable configuration problems (empty == OK)."""
         problems: List[str] = []
-        if self.source not in ("csv", "selenium"):
-            problems.append(f"Unknown source {self.source!r} (expected 'csv' or 'selenium').")
+        if self.source not in ("csv", "json", "selenium"):
+            problems.append(
+                f"Unknown source {self.source!r} (expected 'csv', 'json' or 'selenium')."
+            )
         if self.note_mode not in ("fill", "prepend", "append", "overwrite"):
             problems.append(
                 f"Unknown note_mode {self.note_mode!r} "
                 "(expected fill/prepend/append/overwrite)."
             )
-        if self.source == "csv" and not self.csv_path:
-            problems.append("source=csv requires --csv / csv_path to be set.")
+        if self.source in ("csv", "json") and not self.csv_path:
+            problems.append(f"source={self.source} requires --csv / csv_path to be set.")
         if self.source == "selenium" and not (self.amazon_email and self.amazon_password):
             problems.append("source=selenium requires amazon_email and amazon_password.")
         return problems
@@ -151,6 +158,9 @@ _SPECS: List[_FieldSpec] = [
     ("include_quantity", _as_bool, "memo", "include_quantity", "ASFA_INCLUDE_QUANTITY"),
     ("note_prefix", str, "memo", "prefix", "ASFA_NOTE_PREFIX"),
     ("max_length", int, "memo", "max_length", "ASFA_MAX_LENGTH"),
+    ("bridge_host", str, "bridge", "host", "ASFA_BRIDGE_HOST"),
+    ("bridge_port", int, "bridge", "port", "ASFA_BRIDGE_PORT"),
+    ("bridge_token", str, "bridge", "token", "ASFA_BRIDGE_TOKEN"),
     ("dry_run", _as_bool, "behaviour", "dry_run", "ASFA_DRY_RUN"),
     ("verbose", _as_bool, "behaviour", "verbose", "ASFA_VERBOSE"),
 ]

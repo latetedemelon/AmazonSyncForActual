@@ -20,8 +20,9 @@ After:   2024-01-11   -$43.76   Amazon.com   "Glad Tall Kitchen Trash Bags | Cre
 
 ## How it works
 
-1. **Read** your Amazon orders from a CSV export (recommended) or by scraping
-   (experimental). Each order becomes a list of items with an all-in total.
+1. **Read** your Amazon orders — from a CSV export, the browser extension
+   (CSV/JSON, or a direct push via the local bridge), or scraping (experimental).
+   Each order becomes a list of items with an all-in total.
 2. **Match** each Amazon transaction in Actual to the order or shipment whose
    total equals the charge and whose date is within a configurable window. Items
    are consumed once, so a single purchase is never attributed to two charges,
@@ -94,6 +95,27 @@ To just inspect what the parser sees, without touching Actual at all:
 ```bash
 amazon-sync-for-actual --csv ./amazon-data.zip --list-orders
 ```
+
+### One-click sync from the extension (the bridge)
+
+Instead of downloading a CSV, you can let the browser extension push orders
+straight into Actual. Because Actual has no plain REST API (it uses a CRDT sync
+protocol), a tiny **local** companion does the write using the same matching
+logic as the CLI:
+
+```bash
+amazon-sync-for-actual -c config.ini --serve      # runs on http://127.0.0.1:5007
+```
+
+Then in the extension's **Settings**, set the bridge URL (and token, if you used
+`--bridge-token`), pick a note mode, and click **Preview in Actual** or **Send to
+Actual**. The bridge:
+
+- pulls your transactions from Actual, matches them to the posted orders, and
+  writes per-transaction notes back down (honoring `note_mode`);
+- binds to **loopback only** and can require a shared token (`--bridge-token` /
+  `ASFA_BRIDGE_TOKEN`) sent as the `X-ASFA-Token` header;
+- exposes `GET /health`, `POST /preview` (always dry-run) and `POST /sync`.
 
 ### Configuration file
 

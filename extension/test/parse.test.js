@@ -64,6 +64,15 @@ test("ordersToCsv emits importer-compatible headers", () => {
   assert.ok(lines[1].endsWith("43.76,B00ABCDEFG,USD"));
 });
 
+test("buildBridgeOptions includes only set values", () => {
+  assert.deepEqual(A.buildBridgeOptions({ noteMode: "fill", account: "", days: "" }),
+    { note_mode: "fill" });
+  assert.deepEqual(
+    A.buildBridgeOptions({ noteMode: "prepend", account: "Amazon Card", days: "30" }),
+    { note_mode: "prepend", account: "Amazon Card", days: 30 });
+  assert.deepEqual(A.buildBridgeOptions({}), {});
+});
+
 test("mergeOrders de-duplicates by order id and items", () => {
   const a = [{ orderId: "X", orderDate: "2024-01-01", orderTotalCents: 100, currency: "USD",
                items: [{ name: "A", asin: "AAA" }] }];

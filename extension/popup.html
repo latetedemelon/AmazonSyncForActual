@@ -28,15 +28,48 @@
   </section>
 
   <section class="actions">
+    <button id="preview">Preview in Actual</button>
+    <button id="send" class="primary">Send to Actual</button>
+  </section>
+
+  <section class="actions">
     <button id="clear" class="ghost">Clear collected data</button>
+    <button id="toggle-settings" class="ghost">Settings &#9881;</button>
   </section>
 
   <p id="status" class="status"></p>
 
+  <details id="settings">
+    <summary>Bridge &amp; Actual settings</summary>
+    <p class="hint">Run the local bridge first:
+       <code>amazon-sync-for-actual --serve</code></p>
+    <label>Bridge URL
+      <input id="s-bridge" type="text" placeholder="http://127.0.0.1:5007" />
+    </label>
+    <label>Bridge token (optional)
+      <input id="s-token" type="password" placeholder="matches --bridge-token" />
+    </label>
+    <label>Note mode
+      <select id="s-notemode">
+        <option value="fill">fill (only if empty)</option>
+        <option value="prepend">prepend</option>
+        <option value="append">append</option>
+        <option value="overwrite">overwrite</option>
+      </select>
+    </label>
+    <label>Account (optional)
+      <input id="s-account" type="text" placeholder="limit to one account name" />
+    </label>
+    <label>Look-back days
+      <input id="s-days" type="number" min="1" placeholder="90" />
+    </label>
+    <button id="save-settings" class="primary">Save settings</button>
+  </details>
+
   <footer>
-    <p>Open your <strong>Returns &amp; Orders</strong> page on Amazon, then
-       click <em>Scan this page</em>. Download the CSV and feed it to
-       <code>amazon-sync-for-actual --csv</code>.</p>
+    <p><strong>Two ways to use:</strong> download a CSV for
+       <code>amazon-sync-for-actual --csv</code>, or run the bridge
+       (<code>--serve</code>) and click <em>Send to Actual</em> for one-click sync.</p>
   </footer>
 
   <script src="lib/parse.js"></script>

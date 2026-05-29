@@ -40,6 +40,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only parse the Amazon source and print the orders; never touch Actual.",
     )
     p.add_argument(
+        "--serve",
+        action="store_true",
+        help="Run the local HTTP bridge so the browser extension can push orders to Actual.",
+    )
+    p.add_argument(
         "--dry-run",
         dest="dry_run",
         action="store_true",
@@ -50,6 +55,13 @@ def build_parser() -> argparse.ArgumentParser:
         "-v", "--verbose", dest="verbose", action="store_true", default=None,
         help="Verbose logging.",
     )
+
+    # Bridge
+    g = p.add_argument_group("Bridge (with --serve)")
+    g.add_argument("--host", dest="bridge_host", help="Bridge bind host (loopback only).")
+    g.add_argument("--port", dest="bridge_port", type=int, help="Bridge port (default 5007).")
+    g.add_argument("--bridge-token", dest="bridge_token",
+                   help="Require this token (X-ASFA-Token header) on bridge writes.")
 
     # Actual connection
     g = p.add_argument_group("Actual connection")
@@ -118,6 +130,7 @@ def _overrides_from_args(args: argparse.Namespace) -> dict:
         "payee_regex", "match_shipments", "include_positive",
         "note_mode", "max_words_per_item", "max_items", "separator",
         "include_quantity", "note_prefix", "max_length",
+        "bridge_host", "bridge_port", "bridge_token",
         "dry_run", "verbose",
     ]
     return {k: getattr(args, k) for k in keys if getattr(args, k, None) is not None}
@@ -178,6 +191,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"Error reading Amazon source: {exc}", file=sys.stderr)
             return 2
         _print_orders(orders)
+        return 0
+
+    # ---- serve: run the local bridge for the browser extension ----
+    if args.serve:
+        try:
+            from .bridge import run_server
+
+            run_server(
+                config,
+                host=config.bridge_host,
+                port=config.bridge_port,
+                token=config.bridge_token,
+            )
+        except (ValueError, OSError) as exc:
+            print(f"Bridge error: {exc}", file=sys.stderr)
+            return 2
         return 0
 
     # ---- full sync (or dry-run) ----

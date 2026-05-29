@@ -49,6 +49,27 @@ loads in current Firefox.)
 
 **Download JSON** is also available if you want the raw structured data.
 
+### One-click: Send to Actual (via the local bridge)
+
+Instead of downloading a file, you can push orders straight into Actual:
+
+1. Start the bridge on your machine:
+
+   ```bash
+   amazon-sync-for-actual -c config.ini --serve      # http://127.0.0.1:5007
+   ```
+
+2. In the extension, open **Settings ⚙** and set the **Bridge URL** (default
+   `http://127.0.0.1:5007`), an optional **token** (matching `--bridge-token`),
+   the **note mode** (fill / prepend / append / overwrite), and optionally an
+   account / look-back days. Click **Save settings**.
+3. Scan your orders, then click **Preview in Actual** (dry-run, shows what would
+   change) or **Send to Actual** (writes the notes).
+
+The bridge runs locally, binds to loopback only, and reuses the CLI's matching
+logic. The extension needs host permission for `127.0.0.1`/`localhost` (declared
+in the manifest) to reach it.
+
 ## What it extracts
 
 Per order: order id, order date, order **total**, currency (from the

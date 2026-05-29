@@ -5,7 +5,20 @@ var orders = [];
 
 function $(id) { return document.getElementById(id); }
 
-function setStatus(msg) { $("status").textContent = msg || ""; }
+function setStatus(msg, kind) {
+  var el = $("status");
+  el.textContent = msg || "";
+  el.className = "status" + (kind ? " " + kind : "");
+}
+
+var DEFAULT_SETTINGS = {
+  bridgeUrl: "http://127.0.0.1:5007",
+  token: "",
+  noteMode: "fill",
+  account: "",
+  days: ""
+};
+var settings = Object.assign({}, DEFAULT_SETTINGS);
 
 function render() {
   $("count").textContent = orders.length;
@@ -15,13 +28,73 @@ function render() {
 }
 
 async function load() {
-  var data = await chrome.storage.local.get("orders");
+  var data = await chrome.storage.local.get(["orders", "settings"]);
   orders = data.orders || [];
+  settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
+  applySettingsToForm();
   render();
 }
 
 async function save() {
   await chrome.storage.local.set({ orders: orders });
+}
+
+function applySettingsToForm() {
+  $("s-bridge").value = settings.bridgeUrl;
+  $("s-token").value = settings.token;
+  $("s-notemode").value = settings.noteMode;
+  $("s-account").value = settings.account;
+  $("s-days").value = settings.days;
+}
+
+function readSettingsFromForm() {
+  settings = {
+    bridgeUrl: $("s-bridge").value.trim() || DEFAULT_SETTINGS.bridgeUrl,
+    token: $("s-token").value,
+    noteMode: $("s-notemode").value,
+    account: $("s-account").value.trim(),
+    days: $("s-days").value.trim()
+  };
+  return settings;
+}
+
+function buildOptions() {
+  return ASFA.buildBridgeOptions(settings);
+}
+
+// POST the collected orders to the local bridge (/preview or /sync).
+async function sendToBridge(path) {
+  if (!orders.length) { setStatus("Nothing collected yet.", "error"); return; }
+  var url = settings.bridgeUrl.replace(/\/+$/, "") + path;
+  setStatus((path === "/sync" ? "Syncing" : "Previewing") + " via bridge…");
+  try {
+    var headers = { "Content-Type": "application/json" };
+    if (settings.token) headers["X-ASFA-Token"] = settings.token;
+    var resp = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({ orders: orders, options: buildOptions() })
+    });
+    var body = await resp.json().catch(function () { return {}; });
+    if (!resp.ok || body.ok === false) {
+      setStatus("Bridge error: " + (body.error || resp.status), "error");
+      return;
+    }
+    var c = body.counts || {};
+    var verb = body.wrote ? "Wrote" : "Would change";
+    setStatus(
+      verb + " " + (c.changed || 0) + " note(s); matched " + (c.matched || 0) +
+      ", " + (c.unmatched_txns || 0) + " unmatched txns, " +
+      (c.unmatched_orders || 0) + " unmatched orders.",
+      "ok"
+    );
+  } catch (e) {
+    setStatus(
+      "Couldn't reach the bridge at " + settings.bridgeUrl +
+      ". Is `amazon-sync-for-actual --serve` running?",
+      "error"
+    );
+  }
 }
 
 async function activeTab() {
@@ -79,6 +152,18 @@ $("clear").addEventListener("click", async function () {
   await save();
   render();
   setStatus("Cleared.");
+});
+
+$("preview").addEventListener("click", function () { sendToBridge("/preview"); });
+$("send").addEventListener("click", function () { sendToBridge("/sync"); });
+$("toggle-settings").addEventListener("click", function () {
+  var d = $("settings");
+  d.open = !d.open;
+});
+$("save-settings").addEventListener("click", async function () {
+  readSettingsFromForm();
+  await chrome.storage.local.set({ settings: settings });
+  setStatus("Settings saved.", "ok");
 });
 
 load();

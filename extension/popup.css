@@ -33,6 +33,15 @@ button:hover { background: #f3f4f6; }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 button.primary:hover { filter: brightness(1.05); }
 button.ghost { background: transparent; color: var(--muted); }
-.status { min-height: 16px; margin: 10px 14px 0; color: var(--accent); font-size: 12px; }
+.status { min-height: 16px; margin: 10px 14px 0; color: var(--accent); font-size: 12px; white-space: pre-wrap; }
+.status.error { color: #b91c1c; }
+.status.ok { color: #15803d; }
+details#settings { margin: 6px 14px 0; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+details#settings summary { cursor: pointer; font-weight: 600; font-size: 12px; }
+details#settings label { display: block; margin: 8px 0 2px; font-size: 11px; color: var(--muted); }
+details#settings input, details#settings select { width: 100%; padding: 5px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
+details#settings .hint { font-size: 11px; color: var(--muted); margin: 4px 0 8px; }
+details#settings code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
+details#settings button { margin-top: 10px; }
 footer { padding: 8px 14px 14px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); margin-top: 10px; }
 footer code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
