@@ -68,6 +68,28 @@ def test_unit_price_fallback_when_total_missing():
     assert orders[0].total_cents == (500 + 50) * 2
 
 
+def test_extension_style_order_total_override():
+    # The browser extension reads the order list page: it knows item names and
+    # the order grand total, but not reliable per-item prices.
+    rows = [
+        {"Order ID": "100-1", "Order Date": "2024-05-01", "Product Name": "Book One",
+         "Quantity": "1", "Order Total": "$25.40"},
+        {"Order ID": "100-1", "Order Date": "2024-05-01", "Product Name": "Book Two",
+         "Quantity": "2", "Order Total": "$25.40"},
+    ]
+    orders = rows_to_orders(rows)
+    assert len(orders) == 1
+    order = orders[0]
+    assert order.total_cents == 2540  # from the order total, not summed items
+    assert order.item_names() == ["Book One", "Book Two"]
+    assert order.items[1].quantity == 2
+
+
+def test_order_total_blank_rows_skipped():
+    rows = [{"Order ID": "", "Product Name": "", "Order Total": ""}]
+    assert rows_to_orders(rows) == []
+
+
 def test_missing_path_raises():
     try:
         CsvSource(None)

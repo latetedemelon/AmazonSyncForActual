@@ -11,6 +11,15 @@ def test_order_total_and_names():
     assert order.item_names() == ["One", "Two"]
 
 
+def test_total_override():
+    order = AmazonOrder(order_id="A")
+    order.add_item(AmazonItem(name="x", total_cents=0))
+    order.add_item(AmazonItem(name="y", total_cents=0))
+    assert order.total_cents == 0
+    order.total_override_cents = 1599
+    assert order.total_cents == 1599
+
+
 def test_shipments_grouping():
     order = AmazonOrder(order_id="B")
     order.add_item(AmazonItem(name="a", total_cents=100, ship_date=date(2024, 1, 2)))

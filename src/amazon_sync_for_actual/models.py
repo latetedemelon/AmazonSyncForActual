@@ -41,10 +41,16 @@ class AmazonOrder:
     order_date: Optional[date] = None
     items: List[AmazonItem] = field(default_factory=list)
     currency: str = "USD"
+    # An explicit order grand total, used when a source knows the order total but
+    # not reliable per-item prices (e.g. the browser extension reading the order
+    # list page). When set it overrides the sum of item totals.
+    total_override_cents: Optional[int] = None
 
     @property
     def total_cents(self) -> int:
-        """Sum of every line item's all-in total."""
+        """The order's all-in total (explicit override, else sum of items)."""
+        if self.total_override_cents is not None:
+            return self.total_override_cents
         return sum(item.total_cents for item in self.items)
 
     def item_names(self) -> List[str]:

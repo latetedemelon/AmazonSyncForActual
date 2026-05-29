@@ -44,6 +44,9 @@ _FIELD_ALIASES: Dict[str, str] = {
     "qty": "quantity",
     "total owed": "total_owed",
     "item total": "total_owed",
+    "order total": "order_total",
+    "grand total": "order_total",
+    "total charged": "order_total",
     "unit price": "unit_price",
     "purchase price per unit": "unit_price",
     "unit price tax": "unit_price_tax",
@@ -106,8 +109,11 @@ def rows_to_orders(rows: List[Dict[str, str]]) -> List[AmazonOrder]:
         canonical = _canonical_row(raw)
         name = canonical.get("name", "")
         total = _line_total_cents(canonical)
-        if not name and total == 0:
-            continue  # skip empty / non-item rows (headers in concatenated files, etc.)
+        order_total = to_cents(canonical.get("order_total"))
+        # Skip rows with no item and no money signal (blank lines, repeated
+        # headers in concatenated files, etc.).
+        if not name and total == 0 and order_total is None:
+            continue
 
         order_id = canonical.get("order_id") or f"_no_order_{len(order_sequence)}"
         currency = canonical.get("currency") or "USD"
@@ -122,17 +128,22 @@ def rows_to_orders(rows: List[Dict[str, str]]) -> List[AmazonOrder]:
         order = orders[order_id]
         if order.order_date is None and order_date is not None:
             order.order_date = order_date
+        # An explicit order grand total (e.g. from the browser extension) wins
+        # over summing per-item totals, which may be unavailable.
+        if order_total is not None:
+            order.total_override_cents = order_total
 
-        order.add_item(
-            AmazonItem(
-                name=name or "(unnamed item)",
-                quantity=_parse_quantity(canonical.get("quantity")),
-                total_cents=total,
-                ship_date=ship_date,
-                asin=canonical.get("asin") or None,
-                currency=currency,
+        if name or total:
+            order.add_item(
+                AmazonItem(
+                    name=name or "(unnamed item)",
+                    quantity=_parse_quantity(canonical.get("quantity")),
+                    total_cents=total,
+                    ship_date=ship_date,
+                    asin=canonical.get("asin") or None,
+                    currency=currency,
+                )
             )
-        )
 
     return [orders[oid] for oid in order_sequence]
 
