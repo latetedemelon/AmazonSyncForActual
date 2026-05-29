@@ -39,6 +39,27 @@
 
   <p id="status" class="status"></p>
 
+  <details id="diagnostics">
+    <summary>Diagnostics &#129514;</summary>
+    <p class="hint">As you browse your Amazon orders, the extension records
+       <strong>redacted</strong> extraction health (no item names, order ids, or
+       amounts &mdash; only formats and coverage). Download the report and share
+       it so extraction can be improved.</p>
+    <label class="check">
+      <input id="diag-enabled" type="checkbox" checked />
+      Record diagnostics while I browse
+    </label>
+    <p id="diag-stats" class="hint">No diagnostics captured yet.</p>
+    <section class="actions">
+      <button id="diag-download" class="primary">Download report</button>
+      <button id="diag-preview">Preview report</button>
+    </section>
+    <section class="actions">
+      <button id="diag-clear" class="ghost">Clear diagnostics</button>
+    </section>
+    <pre id="diag-out" class="diag-out" hidden></pre>
+  </details>
+
   <details id="settings">
     <summary>Bridge &amp; Actual settings</summary>
     <p class="hint">Run the local bridge first:
@@ -73,6 +94,7 @@
   </footer>
 
   <script src="lib/parse.js"></script>
+  <script src="lib/diagnostics.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

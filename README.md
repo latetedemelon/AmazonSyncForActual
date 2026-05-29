@@ -117,6 +117,20 @@ Actual**. The bridge:
   `ASFA_BRIDGE_TOKEN`) sent as the `X-ASFA-Token` header;
 - exposes `GET /health`, `POST /preview` (always dry-run) and `POST /sync`.
 
+### Diagnostics
+
+The extension can record **redacted** extraction health as you browse (no item
+names, order ids, or amounts — only coverage counts, CSS class hints and value
+*shapes*). Download the report from its **Diagnostics** panel and turn it into a
+readable per-marketplace verdict with:
+
+```bash
+amazon-sync-for-actual --diag-report asfa-diagnostics-YYYY-MM-DD.json
+```
+
+See [`extension/README.md`](extension/README.md#diagnostics-help-improve-extraction)
+for what is and isn't captured.
+
 ### Configuration file
 
 Copy [`config.example.ini`](config.example.ini) to `config.ini` (gitignored)

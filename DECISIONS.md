@@ -178,6 +178,31 @@ instead of only producing a file.
   look-back) and **Preview / Send to Actual** buttons; `host_permissions` for
   `127.0.0.1`/`localhost` added to the manifest so the popup can reach the bridge.
 
+## Diagnostics / telemetry (local-first, redacted)
+
+Added so extraction problems are *actionable* without violating the
+"everything stays in the browser" model.
+
+- **What it is.** As you browse order pages, the content script records a
+  redacted per-page report (`extension/lib/diagnostics.js`): coverage counts
+  (cards → id/date/total/items), which card selector matched, and for each failed
+  field the value **shape** plus nearby CSS class names.
+- **Privacy by construction.** No item names, order ids, addresses, names or real
+  amounts are ever stored. Money/dates are reduced to shapes (`$#,###.##`,
+  `## Xxxxxxxx ####`); free text is scrubbed of urls/order-ids/long digits; only
+  class tokens (app chrome) and counts remain. A jsdom test asserts known values
+  (`99.95`, product names, order ids) never appear in the serialized report.
+- **Local-first, opt-out.** Reports go to a capped (300) ring buffer in
+  `chrome.storage.local`; nothing is transmitted. The popup's **Diagnostics**
+  panel previews/downloads/clears them and has an on/off toggle (`diagEnabled`).
+- **Actionable on our side.** `--diag-report FILE` (`diagnostics.py`,
+  `summarize_file`) renders a downloaded report into a per-marketplace coverage
+  table and ranked failure patterns. Pure/stdlib, fully tested; it also recomputes
+  a summary from raw reports if needed.
+- **Why not auto-upload.** Telemetry that phones home would break the privacy
+  promise and require a server. Download-and-share keeps the user in control and
+  the architecture serverless; the bridge remains opt-in and unchanged.
+
 ## Cross-marketplace compatibility
 
 Documented in `COMPATIBILITY.md`. Goal per request: every English-first

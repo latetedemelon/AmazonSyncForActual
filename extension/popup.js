@@ -166,4 +166,55 @@ $("save-settings").addEventListener("click", async function () {
   setStatus("Settings saved.", "ok");
 });
 
+// ---- Diagnostics ---------------------------------------------------------
+async function loadDiagnostics() {
+  var data = await chrome.storage.local.get(["diagEnabled", "diagReports"]);
+  $("diag-enabled").checked = data.diagEnabled !== false;
+  renderDiagStats(data.diagReports || []);
+}
+
+function renderDiagStats(reports) {
+  var pages = reports.filter(function (r) { return r && r.kind === "page"; }).length;
+  var errs = reports.filter(function (r) { return r && r.kind === "error"; }).length;
+  $("diag-stats").textContent = reports.length
+    ? (reports.length + " record(s): " + pages + " page(s), " + errs + " error(s).")
+    : "No diagnostics captured yet.";
+}
+
+async function getReports() {
+  var data = await chrome.storage.local.get("diagReports");
+  return data.diagReports || [];
+}
+
+$("diag-enabled").addEventListener("change", async function () {
+  await chrome.storage.local.set({ diagEnabled: $("diag-enabled").checked });
+  setStatus($("diag-enabled").checked ? "Diagnostics on." : "Diagnostics off.", "ok");
+});
+
+$("diag-download").addEventListener("click", async function () {
+  var reports = await getReports();
+  if (!reports.length) return setStatus("No diagnostics captured yet.", "error");
+  var summary = ASFA_DIAG.summarizeReports(reports);
+  var payload = { summary: summary, reports: reports };
+  download(JSON.stringify(payload, null, 2),
+    "asfa-diagnostics-" + today() + ".json", "application/json");
+  setStatus("Diagnostics report downloaded.", "ok");
+});
+
+$("diag-preview").addEventListener("click", async function () {
+  var reports = await getReports();
+  var out = $("diag-out");
+  if (!reports.length) { out.hidden = true; return setStatus("No diagnostics yet.", "error"); }
+  out.textContent = JSON.stringify(ASFA_DIAG.summarizeReports(reports), null, 2);
+  out.hidden = false;
+});
+
+$("diag-clear").addEventListener("click", async function () {
+  await chrome.storage.local.set({ diagReports: [] });
+  $("diag-out").hidden = true;
+  renderDiagStats([]);
+  setStatus("Diagnostics cleared.", "ok");
+});
+
 load();
+loadDiagnostics();

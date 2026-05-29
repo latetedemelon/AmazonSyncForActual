@@ -70,6 +70,33 @@ The bridge runs locally, binds to loopback only, and reuses the CLI's matching
 logic. The extension needs host permission for `127.0.0.1`/`localhost` (declared
 in the manifest) to reach it.
 
+## Diagnostics (help improve extraction)
+
+Amazon changes its markup often and differs subtly between marketplaces, so the
+extension can record **how well extraction is working** as you browse — and it
+does so **without capturing any personal data**.
+
+Open **Diagnostics 🧪** in the popup. With it enabled (default), each order page
+you visit appends a *redacted* record to local storage:
+
+- coverage counts (how many order cards yielded an id / date / total / items),
+- which CSS card selector matched,
+- for any field that failed, the **shape** of the value (e.g. a price becomes
+  `$#,###.##`, a date becomes `## Xxxxxxxx ####`) and the nearby CSS class names.
+
+Crucially, it never stores item names, order ids, addresses, names, or actual
+amounts — only formats, counts and class names. Click **Preview report** to see
+the summary, or **Download report** to save `asfa-diagnostics-YYYY-MM-DD.json`
+and share it. You (or a maintainer) can turn it into a readable verdict with:
+
+```bash
+amazon-sync-for-actual --diag-report asfa-diagnostics-YYYY-MM-DD.json
+```
+
+That prints per-marketplace coverage and the top failure patterns — exactly what
+is needed to fix a selector. Untick the checkbox to stop recording, or
+**Clear diagnostics** to wipe what's stored. Everything stays in your browser.
+
 ## What it extracts
 
 Per order: order id, order date, order **total**, currency (from the

@@ -54,3 +54,36 @@ test("currency falls back to host when not provided",
     const orders = extractOrdersFromDocument(docFrom("orders_uk.html"), { host: "amazon.com.au" });
     assert.equal(orders[0].currency, "AUD");
   });
+
+test("diagnostics mode returns {orders, report} with coverage",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    const res = extractOrdersFromDocument(docFrom("orders_us.html"),
+      { host: "amazon.com", diagnostics: true, path: "/your-orders/orders" });
+    assert.ok(Array.isArray(res.orders));
+    assert.equal(res.report.kind, "page");
+    assert.equal(res.report.pathKind, "your-orders");
+    assert.equal(res.report.cardSelectorUsed, ".order-card.js-order-card");
+    assert.equal(res.report.coverage.cards, 2);
+    assert.equal(res.report.coverage.orderTotal, 2);
+    assert.equal(res.report.fieldFailures.length, 0);
+    // No personal data on the report.
+    const blob = JSON.stringify(res.report);
+    assert.ok(!/Trash Bags|Mouthwash|111-2222222/.test(blob));
+  });
+
+test("diagnostics records redacted failures for a broken card",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    const res = extractOrdersFromDocument(docFrom("orders_broken.html"),
+      { host: "amazon.co.uk", diagnostics: true, path: "/your-orders/orders" });
+    const report = res.report;
+    assert.equal(report.coverage.cards, 2);
+    // The broken card should have at least one failure entry.
+    assert.ok(report.fieldFailures.length >= 1);
+    const f = report.fieldFailures[0];
+    assert.ok(f.missing.length >= 1);
+    // Structural class hints captured to help fix selectors...
+    assert.ok(f.classes.some((c) => /order-total-mystery|product-thumb/.test(c)));
+    // ...but the real amount "99.95" must never appear; only its shape may.
+    const blob = JSON.stringify(report);
+    assert.ok(!/99\.95/.test(blob), "raw amount must not leak");
+  });

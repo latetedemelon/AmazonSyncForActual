@@ -43,5 +43,11 @@ details#settings input, details#settings select { width: 100%; padding: 5px 6px;
 details#settings .hint { font-size: 11px; color: var(--muted); margin: 4px 0 8px; }
 details#settings code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
 details#settings button { margin-top: 10px; }
+details#diagnostics { margin: 6px 14px 0; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+details#diagnostics summary { cursor: pointer; font-weight: 600; font-size: 12px; }
+details#diagnostics .hint { font-size: 11px; color: var(--muted); margin: 6px 0; }
+details#diagnostics .check { display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 6px 0; }
+details#diagnostics .check input { width: auto; }
+.diag-out { max-height: 220px; overflow: auto; background: #0b1021; color: #c7d2fe; font-size: 10px; line-height: 1.35; padding: 8px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
 footer { padding: 8px 14px 14px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); margin-top: 10px; }
 footer code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }

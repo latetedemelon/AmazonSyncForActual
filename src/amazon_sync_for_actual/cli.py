@@ -45,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the local HTTP bridge so the browser extension can push orders to Actual.",
     )
     p.add_argument(
+        "--diag-report",
+        dest="diag_report",
+        metavar="FILE",
+        help="Summarize a diagnostics report exported by the browser extension and exit.",
+    )
+    p.add_argument(
         "--dry-run",
         dest="dry_run",
         action="store_true",
@@ -180,6 +186,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
     _setup_logging(config.verbose)
+
+    # ---- diag-report: summarize an extension diagnostics export and exit ----
+    if args.diag_report:
+        try:
+            from .diagnostics import summarize_file
+
+            print(summarize_file(args.diag_report))
+        except (ValueError, OSError) as exc:
+            print(f"Error reading diagnostics report: {exc}", file=sys.stderr)
+            return 2
+        return 0
 
     # ---- list-orders: source only, no Actual ----
     if args.list_orders:

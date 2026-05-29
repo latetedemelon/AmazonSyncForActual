@@ -16,6 +16,13 @@
   var ASFA = (typeof module !== "undefined" && module.exports)
     ? require("./lib/parse.js")
     : globalThis.ASFA;
+  var DIAG = (typeof module !== "undefined" && module.exports)
+    ? require("./lib/diagnostics.js")
+    : globalThis.ASFA_DIAG;
+
+  // CSS class tokens worth surfacing in diagnostics when a card fails to yield a
+  // field: these are the structural hooks we'd use to repair selectors.
+  var INTERESTING_CLASS_RE = /(order|total|price|date|placed|item|qty|quantity|ship|delivery|product|card|grid)/i;
 
   var ORDER_ID_RE = /\b\d{3}-\d{7}-\d{7}\b/;
   var ASIN_RE = /\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i;
@@ -39,12 +46,16 @@
     return el && el.textContent ? el.textContent.replace(/\s+/g, " ").trim() : "";
   }
 
+  // Returns { cards, selector } so diagnostics can record which selector worked
+  // (or that none did, which is the most important signal of a markup change).
   function findOrderCards(doc) {
     for (var i = 0; i < CARD_SELECTORS.length; i++) {
       var els = doc.querySelectorAll(CARD_SELECTORS[i]);
-      if (els && els.length) return Array.prototype.slice.call(els);
+      if (els && els.length) {
+        return { cards: Array.prototype.slice.call(els), selector: CARD_SELECTORS[i] };
+      }
     }
-    return [];
+    return { cards: [], selector: null };
   }
 
   function valueNear(labelEl) {
@@ -167,12 +178,33 @@
   function extractOrderFromCard(card, currency) {
     var totalStr = findLabeledValue(card, LABEL_TOTAL);
     var dateStr = findLabeledValue(card, LABEL_DATE) || findFirstDate(card);
-    return {
+    var order = {
       orderId: extractOrderId(card),
       orderDate: dateStr ? ASFA.normalizeDate(dateStr) : "",
       orderTotalCents: totalStr != null ? ASFA.parseMoneyToCents(totalStr) : null,
       currency: currency || "USD",
       items: extractItems(card)
+    };
+    // Stash the raw matched strings (non-enumerable-ish helper field) so the
+    // diagnostics layer can derive redacted *shapes* without re-querying the DOM.
+    order._raw = { totalStr: totalStr, dateStr: dateStr };
+    return order;
+  }
+
+  // Build a redacted, per-card field-failure record for diagnostics.
+  function cardDiagnostic(card, order) {
+    var missing = [];
+    if (!order.orderId) missing.push("orderId");
+    if (!order.orderDate) missing.push("orderDate");
+    if (order.orderTotalCents == null) missing.push("orderTotal");
+    if (!order.items.length) missing.push("items");
+    if (!missing.length) return null;
+    var raw = order._raw || {};
+    return {
+      missing: missing,
+      totalShape: DIAG ? DIAG.shapeOf(raw.totalStr, 24) : "",
+      dateShape: DIAG ? DIAG.shapeOf(raw.dateStr, 24) : "",
+      classes: DIAG ? DIAG.collectMatchingClasses(card, INTERESTING_CLASS_RE, 12) : []
     };
   }
 
@@ -183,12 +215,45 @@
       (typeof location !== "undefined" ? location.hostname : "");
     var currency = opts.currency || ASFA.currencyForHost(host);
 
+    var found = findOrderCards(doc);
     var orders = [];
-    findOrderCards(doc).forEach(function (card) {
+    var coverage = { cards: found.cards.length, orderId: 0, orderDate: 0, orderTotal: 0, items: 0 };
+    var fieldFailures = [];
+
+    found.cards.forEach(function (card) {
       var order = extractOrderFromCard(card, currency);
+      if (order.orderId) coverage.orderId++;
+      if (order.orderDate) coverage.orderDate++;
+      if (order.orderTotalCents != null) coverage.orderTotal++;
+      if (order.items.length) coverage.items++;
+      if (opts.diagnostics) {
+        var d = cardDiagnostic(card, order);
+        if (d) fieldFailures.push(d);
+      }
+      delete order._raw;
       if (order.items.length || order.orderTotalCents != null) orders.push(order);
     });
-    return ASFA.mergeOrders(orders);
+
+    var merged = ASFA.mergeOrders(orders);
+    if (!opts.diagnostics) return merged;
+
+    return {
+      orders: merged,
+      report: {
+        v: DIAG ? DIAG.SCHEMA_VERSION : 1,
+        kind: "page",
+        at: new Date().toISOString(),
+        host: host,
+        pathKind: DIAG
+          ? DIAG.pathKind(opts.path || (doc && doc.location && doc.location.pathname) ||
+              (typeof location !== "undefined" ? location.pathname : ""))
+          : "other",
+        cardSelectorUsed: found.selector,
+        ordersExtracted: merged.length,
+        coverage: coverage,
+        fieldFailures: fieldFailures
+      }
+    };
   }
 
   // ---- Multi-page scan (browser only) ----------------------------------
@@ -215,12 +280,44 @@
     return all;
   }
 
+  // ---- Diagnostics capture (browser only) ------------------------------
+  // Append a redacted page report to a capped local ring buffer in
+  // chrome.storage.local. Nothing leaves the browser here.
+  function recordReport(report) {
+    if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
+    try {
+      chrome.storage.local.get(["diagEnabled", "diagReports"], function (data) {
+        if (data.diagEnabled === false) return; // opt-out
+        var next = (DIAG ? DIAG.ringPush(data.diagReports, report, 300)
+                         : (data.diagReports || []).concat([report]));
+        chrome.storage.local.set({ diagReports: next });
+      });
+    } catch (e) { /* never let diagnostics break extraction */ }
+  }
+
+  function captureCurrentPage() {
+    try {
+      var res = extractOrdersFromDocument(document, { diagnostics: true });
+      if (res && res.report) recordReport(res.report);
+    } catch (e) {
+      recordReport({
+        v: DIAG ? DIAG.SCHEMA_VERSION : 1, kind: "error",
+        at: new Date().toISOString(),
+        host: (typeof location !== "undefined" ? location.hostname : ""),
+        pathKind: DIAG && typeof location !== "undefined" ? DIAG.pathKind(location.pathname) : "other",
+        error: { name: e && e.name, message: DIAG ? DIAG.redactText(e && e.message, 200) : "" }
+      });
+    }
+  }
+
   // ---- Messaging (browser only) ----------------------------------------
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       if (!msg) return;
       if (msg.type === "SCAN_PAGE") {
-        sendResponse({ orders: extractOrdersFromDocument(document) });
+        var res = extractOrdersFromDocument(document, { diagnostics: true });
+        if (res && res.report) recordReport(res.report);
+        sendResponse({ orders: res.orders });
         return true;
       }
       if (msg.type === "SCAN_PAGES") {
@@ -229,13 +326,32 @@
         });
         return true; // async response
       }
+      if (msg.type === "CAPTURE_DIAGNOSTICS") {
+        captureCurrentPage();
+        sendResponse({ ok: true });
+        return true;
+      }
     });
+
+    // Passively capture this page's extraction health on load so you can just
+    // browse your orders and collect actionable data without clicking anything.
+    if (typeof window !== "undefined") {
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        setTimeout(captureCurrentPage, 1200);
+      } else {
+        window.addEventListener("DOMContentLoaded", function () {
+          setTimeout(captureCurrentPage, 1200);
+        });
+      }
+    }
   }
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
       extractOrdersFromDocument: extractOrdersFromDocument,
       extractOrderFromCard: extractOrderFromCard,
+      cardDiagnostic: cardDiagnostic,
+      findOrderCards: findOrderCards,
       findLabeledValue: findLabeledValue,
       extractItems: extractItems,
       extractOrderId: extractOrderId,

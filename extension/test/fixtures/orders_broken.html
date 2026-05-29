@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+  <div class="your-orders-content">
+    <!-- A well-formed card -->
+    <div class="order-card js-order-card">
+      <div class="order-header">
+        <div class="a-row">
+          <div class="a-column">
+            <span class="a-color-secondary label">Order placed</span>
+            <span class="a-color-secondary value">January 10, 2024</span>
+          </div>
+          <div class="a-column">
+            <span class="a-color-secondary label">Total</span>
+            <span class="a-color-secondary value">$43.76</span>
+          </div>
+          <div class="a-column yohtmlc-order-id">
+            <span class="a-color-secondary label">Order #</span>
+            <span class="value" dir="ltr">111-2222222-3333333</span>
+          </div>
+        </div>
+      </div>
+      <div class="order-body">
+        <div class="a-fixed-left-grid">
+          <div class="yohtmlc-item">
+            <a class="a-link-normal" href="/dp/B00ABCDEFG/ref=ppx_yo">Trash Bags</a>
+            <span class="item-view-qty">1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A broken card: no recognizable total label, no order id, no item link.
+         The extractor should fail its fields and diagnostics should capture the
+         redacted shapes + structural classes (but NOT the real amount). -->
+    <div class="order-card js-order-card">
+      <div class="order-header">
+        <div class="a-row">
+          <div class="a-column">
+            <span class="newfangled-date">15 February 2024</span>
+          </div>
+          <div class="a-column order-total-mystery">
+            <span class="newfangled-amount">$ 99.95</span>
+          </div>
+        </div>
+      </div>
+      <div class="order-body">
+        <div class="product-thumb">
+          <span>An item with no product link</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
