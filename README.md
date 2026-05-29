@@ -46,19 +46,26 @@ This installs the `amazon-sync-for-actual` (and short alias `asfa`) command.
 Talking to Actual uses [`actualpy`](https://github.com/bvanelli/actualpy), which
 is pulled in automatically.
 
-## Step 1 — get your Amazon order data (recommended: CSV)
+## Step 1 — get your Amazon order data
 
-Amazon no longer offers the old one-click order report and actively blocks
-scraping, so the reliable path is the official data export:
+You have two ways to produce the order CSV. Both work on **all English Amazon
+marketplaces** (amazon.com, .ca, .co.uk, .com.au, .in, .sg, .ie, .ae, .co.za)
+and more — see [`COMPATIBILITY.md`](COMPATIBILITY.md).
+
+**Option A — Browser extension (fastest).** The bundled [`extension/`](extension/)
+reads orders straight from your logged-in *Your Orders* page and downloads a
+ready-to-import CSV. No credentials stored, no waiting. See
+[`extension/README.md`](extension/README.md) to load it.
+
+**Option B — Official data export (no install).** Amazon's standardized export:
 
 1. Go to **Account → Privacy Central → [Request My Data](https://www.amazon.com/gp/privacycentral/dsar/preview.html)**.
-2. Choose **"Your Orders"** and submit the request. Amazon emails you a ZIP
-   (usually within a few hours to a day).
+2. Choose **"Your Orders"** and submit. Amazon emails you a ZIP (hours to a day).
 3. The useful file inside is `Retail.OrderHistory.1/Retail.OrderHistory.1.csv`.
 
-You can point the tool at the unzipped CSV, at a directory, or at the raw ZIP —
-it finds the order file either way. The older "Order history report" CSV and
-similar exports are also understood via header aliases.
+You can point the tool at an unzipped CSV, a directory, or the raw ZIP — it finds
+the order file either way. The older "Order history report" CSV and the
+extension's CSV are all understood via header aliases.
 
 ## Step 2 — point it at Actual
 
@@ -150,6 +157,15 @@ pytest
 
 The suite runs entirely offline — no Actual server, Amazon account, or optional
 dependency required.
+
+## Marketplace compatibility
+
+Both the CSV export and the browser extension target **every English-first
+marketplace** (US, CA, UK, AU/NZ, IN, SG, IE, AE, ZA), with money/date/currency
+handling verified by tests; many non-English marketplaces work too. The CSV
+export is marketplace-proof (English headers, ISO dates) and the extension uses a
+single extractor across regions. Full matrix and caveats:
+[`COMPATIBILITY.md`](COMPATIBILITY.md).
 
 ## Limitations
 

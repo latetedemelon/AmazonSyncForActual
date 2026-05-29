@@ -28,6 +28,11 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Node / extension
+node_modules/
+extension/node_modules/
+package-lock.json
+
 # Legacy
 test_data
 tmp/

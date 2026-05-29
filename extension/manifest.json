@@ -1,0 +1,81 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Sync for Actual",
+  "version": "0.2.0",
+  "description": "Gather your Amazon order details and export a CSV for Amazon Sync for Actual (Actual Budget). Works on all English Amazon marketplaces.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Amazon Sync for Actual",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.amazon.com/gp/*order-history*",
+        "*://*.amazon.com/your-orders/*",
+        "*://*.amazon.ca/gp/*order-history*",
+        "*://*.amazon.ca/your-orders/*",
+        "*://*.amazon.co.uk/gp/*order-history*",
+        "*://*.amazon.co.uk/your-orders/*",
+        "*://*.amazon.com.au/gp/*order-history*",
+        "*://*.amazon.com.au/your-orders/*",
+        "*://*.amazon.in/gp/*order-history*",
+        "*://*.amazon.in/your-orders/*",
+        "*://*.amazon.sg/gp/*order-history*",
+        "*://*.amazon.sg/your-orders/*",
+        "*://*.amazon.ie/gp/*order-history*",
+        "*://*.amazon.ie/your-orders/*",
+        "*://*.amazon.ae/gp/*order-history*",
+        "*://*.amazon.ae/your-orders/*",
+        "*://*.amazon.co.za/gp/*order-history*",
+        "*://*.amazon.co.za/your-orders/*",
+        "*://*.amazon.com.mx/gp/*order-history*",
+        "*://*.amazon.com.mx/your-orders/*",
+        "*://*.amazon.com.br/gp/*order-history*",
+        "*://*.amazon.com.br/your-orders/*",
+        "*://*.amazon.de/gp/*order-history*",
+        "*://*.amazon.de/your-orders/*",
+        "*://*.amazon.fr/gp/*order-history*",
+        "*://*.amazon.fr/your-orders/*",
+        "*://*.amazon.es/gp/*order-history*",
+        "*://*.amazon.es/your-orders/*",
+        "*://*.amazon.it/gp/*order-history*",
+        "*://*.amazon.it/your-orders/*",
+        "*://*.amazon.nl/gp/*order-history*",
+        "*://*.amazon.nl/your-orders/*",
+        "*://*.amazon.com.be/gp/*order-history*",
+        "*://*.amazon.com.be/your-orders/*",
+        "*://*.amazon.se/gp/*order-history*",
+        "*://*.amazon.se/your-orders/*",
+        "*://*.amazon.pl/gp/*order-history*",
+        "*://*.amazon.pl/your-orders/*",
+        "*://*.amazon.com.tr/gp/*order-history*",
+        "*://*.amazon.com.tr/your-orders/*",
+        "*://*.amazon.co.jp/gp/*order-history*",
+        "*://*.amazon.co.jp/your-orders/*",
+        "*://*.amazon.sa/gp/*order-history*",
+        "*://*.amazon.sa/your-orders/*",
+        "*://*.amazon.eg/gp/*order-history*",
+        "*://*.amazon.eg/your-orders/*"
+      ],
+      "js": [
+        "lib/parse.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Order ID,Order Date,Ship Date,Product Name,Quantity,Unit Price,Total Owed,Order Total,ASIN,Currency
+111-2222222-3333333,2024-01-10,,Glad Tall Kitchen Trash Bags OdorShield 13 Gallon,1,,,43.76,B00ABCDEFG,USD
+111-2222222-3333333,2024-01-10,,Crest ProHealth Advanced Mouthwash Mint 16 oz,1,,,43.76,B00HIJKLMN,USD
+114-5555555-6666666,2024-02-02,,AAA Batteries 24 Pack,2,,,12.50,B00QRSTUVW,USD
+203-1234567-7654321,2024-01-12,,Russell Hobbs Stainless Steel Kettle 1.7L,1,,,29.99,B00UKKET01,GBP

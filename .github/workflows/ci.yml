@@ -32,6 +32,20 @@ jobs:
       - name: Run tests
         run: pytest
 
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install extension dev deps (jsdom)
+        working-directory: extension
+        run: npm install --no-fund --no-audit
+      - name: Run extension tests
+        working-directory: extension
+        run: node --test
+
   build:
     runs-on: ubuntu-latest
     steps:

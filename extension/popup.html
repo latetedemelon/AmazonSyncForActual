@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="popup.css" />
+  <title>Amazon Sync for Actual</title>
+</head>
+<body>
+  <header>
+    <h1>Amazon Sync for Actual</h1>
+    <p class="sub">Gather Amazon order data &rarr; CSV for Actual Budget</p>
+  </header>
+
+  <section class="stats">
+    <div><span id="count">0</span><label>orders</label></div>
+    <div><span id="items">0</span><label>items</label></div>
+  </section>
+
+  <section class="actions">
+    <button id="scan" class="primary">Scan this page</button>
+    <button id="scanmore">Scan more pages</button>
+  </section>
+
+  <section class="actions">
+    <button id="csv" class="primary">Download CSV</button>
+    <button id="json">Download JSON</button>
+  </section>
+
+  <section class="actions">
+    <button id="clear" class="ghost">Clear collected data</button>
+  </section>
+
+  <p id="status" class="status"></p>
+
+  <footer>
+    <p>Open your <strong>Returns &amp; Orders</strong> page on Amazon, then
+       click <em>Scan this page</em>. Download the CSV and feed it to
+       <code>amazon-sync-for-actual --csv</code>.</p>
+  </footer>
+
+  <script src="lib/parse.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
