@@ -1,6 +1,10 @@
-bs4
-html5lib
-requests
-selenium
-webdriver-manager
-pyotp
+# Runtime dependency for talking to Actual Budget.
+# (Imported lazily; only needed when actually syncing to Actual.)
+actualpy>=0.10
+
+# --- Optional: experimental Selenium scraping backend (source=selenium) ---
+# Install these only if you use --source selenium instead of a CSV export.
+# selenium>=4.10
+# beautifulsoup4>=4.9
+# html5lib
+# pyotp

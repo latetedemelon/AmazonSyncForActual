@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amazon-sync-for-actual"
+version = "0.2.0"
+description = "Enrich Amazon transactions in Actual Budget with itemized order details."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "AmazonSyncForActual contributors" }]
+keywords = ["actual", "actualbudget", "amazon", "budget", "finance", "personal-finance"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial",
+    "Environment :: Console",
+]
+
+# actualpy is the whole point of the tool, so it's a core dependency. It is
+# nonetheless imported lazily, so the data-parsing parts work even without it.
+dependencies = [
+    "actualpy>=0.10",
+]
+
+[project.optional-dependencies]
+# Experimental Amazon scraping backend.
+selenium = [
+    "selenium>=4.10",
+    "beautifulsoup4>=4.9",
+    "html5lib",
+    "pyotp",
+]
+# Everything needed to run the test suite.
+dev = [
+    "pytest>=7",
+    "beautifulsoup4>=4.9",
+    "html5lib",
+]
+
+[project.urls]
+Homepage = "https://github.com/latetedemelon/amazonsyncforactual"
+Issues = "https://github.com/latetedemelon/amazonsyncforactual/issues"
+
+[project.scripts]
+amazon-sync-for-actual = "amazon_sync_for_actual.cli:main"
+asfa = "amazon_sync_for_actual.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
