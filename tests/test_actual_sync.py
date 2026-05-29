@@ -50,6 +50,20 @@ def test_append_mode():
     assert again[0].action == "skip-idempotent"
 
 
+def test_prepend_mode():
+    updates = plan_updates(_single_match(notes="prior"), MemoOptions(), note_mode="prepend")
+    assert updates[0].action == "prepend"
+    assert updates[0].new_notes == "Trash Bags | prior"
+    # Writes into an empty note like a plain write.
+    empty = plan_updates(_single_match(notes=""), MemoOptions(), note_mode="prepend")
+    assert empty[0].action == "write"
+    assert empty[0].new_notes == "Trash Bags"
+    # Running again is idempotent (memo already present).
+    again = plan_updates(_single_match(notes="Trash Bags | prior"), MemoOptions(),
+                         note_mode="prepend")
+    assert again[0].action == "skip-idempotent"
+
+
 def test_overwrite_mode():
     updates = plan_updates(_single_match(notes="prior"), MemoOptions(), note_mode="overwrite")
     assert updates[0].action == "write"

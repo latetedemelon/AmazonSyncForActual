@@ -60,6 +60,11 @@ def test_override_none_is_ignored(tmp_path):
 def test_validate_problems():
     assert any("csv" in p for p in Config(source="csv", csv_path=None).validate())
     assert any("note_mode" in p for p in Config(note_mode="bogus", csv_path="x").validate())
+    # All four note modes are accepted.
+    for mode in ("fill", "prepend", "append", "overwrite"):
+        assert not any(
+            "note_mode" in p for p in Config(note_mode=mode, csv_path="x").validate()
+        )
 
 
 def test_memo_options_roundtrip():

@@ -89,7 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Memo
     g = p.add_argument_group("Memo / notes")
-    g.add_argument("--note-mode", choices=["fill", "append", "overwrite"], dest="note_mode")
+    g.add_argument(
+        "--note-mode",
+        choices=["fill", "prepend", "append", "overwrite"],
+        dest="note_mode",
+        help="How to write notes: fill (only if empty), prepend, append, or overwrite.",
+    )
     g.add_argument("--max-words-per-item", dest="max_words_per_item", type=int)
     g.add_argument("--max-items", dest="max_items", type=int)
     g.add_argument("--separator", dest="separator")
@@ -142,7 +147,7 @@ def _print_plan(result) -> None:
         t = update.txn
         date = t.date.isoformat() if t.date else "????-??-??"
         marker = {
-            "write": "WRITE ", "append": "APPEND",
+            "write": "WRITE ", "append": "APPEND", "prepend": "PREPND",
             "skip-existing": "KEEP  ", "skip-idempotent": "SAME  ",
             "empty-memo": "EMPTY ",
         }.get(update.action, update.action)

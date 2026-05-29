@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 __all__ = ["Update", "SyncResult", "plan_updates", "ActualSyncer", "CHANGING_ACTIONS"]
 
 # Actions that represent an actual write to the transaction.
-CHANGING_ACTIONS = {"write", "append"}
+CHANGING_ACTIONS = {"write", "append", "prepend"}
 
 
 @dataclass
@@ -57,10 +57,11 @@ class SyncResult:
     def summary(self) -> str:
         writes = sum(1 for u in self.updates if u.action == "write")
         appends = sum(1 for u in self.updates if u.action == "append")
-        skipped = len(self.updates) - writes - appends
+        prepends = sum(1 for u in self.updates if u.action == "prepend")
+        skipped = len(self.updates) - writes - appends - prepends
         return (
             f"matched={len(self.updates)} "
-            f"write={writes} append={appends} skipped={skipped} "
+            f"write={writes} prepend={prepends} append={appends} skipped={skipped} "
             f"unmatched_txns={len(self.unmatched_txns)} "
             f"unmatched_orders={len(self.unmatched_orders)} "
             f"committed={self.committed}"
@@ -75,7 +76,8 @@ def plan_updates(
     """Decide the new note for each match according to *note_mode*.
 
     ``fill``      only writes when the note is currently empty (safe default).
-    ``append``    appends the memo when not already present.
+    ``prepend``   inserts the memo before any existing note.
+    ``append``    adds the memo after any existing note (postpend).
     ``overwrite`` replaces the note entirely.
 
     Every mode is idempotent: re-running never produces a duplicate change.
@@ -94,6 +96,13 @@ def plan_updates(
         if note_mode == "overwrite":
             action = "skip-idempotent" if existing == memo else "write"
             new_notes = existing if action == "skip-idempotent" else memo
+        elif note_mode == "prepend":
+            if memo in existing:
+                action, new_notes = "skip-idempotent", existing
+            elif not existing:
+                action, new_notes = "write", memo
+            else:
+                action, new_notes = "prepend", memo + memo_opts.separator + existing
         elif note_mode == "append":
             if memo in existing:
                 action, new_notes = "skip-idempotent", existing

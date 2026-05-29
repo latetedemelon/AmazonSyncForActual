@@ -27,8 +27,9 @@ After:   2024-01-11   -$43.76   Amazon.com   "Glad Tall Kitchen Trash Bags | Cre
    are consumed once, so a single purchase is never attributed to two charges,
    and split shipments charged separately are matched individually.
 3. **Write** the item names into the transaction note. By default this only
-   fills *empty* notes (it never clobbers notes you wrote yourself), and every
-   mode is idempotent — re-running makes no duplicate changes.
+   fills *empty* notes (it never clobbers notes you wrote yourself); with
+   `--note-mode` you can instead `prepend`, `append`, or `overwrite`. Every mode
+   is idempotent — re-running makes no duplicate changes.
 
 The data-wrangling core (parsing, matching, memo building) has no heavy
 dependencies and is fully unit-tested. `actualpy` and `selenium` are imported
@@ -110,7 +111,7 @@ are still recognized for backwards compatibility.
 | `--date-window-days N` | Max gap between a charge and an order date | 5 |
 | `--tolerance-cents N` | Allowed rounding difference when matching totals | 0 |
 | `--payee-regex RE` | Which payees count as Amazon | `amazon\|amzn\|…` |
-| `--note-mode` | `fill` (only if empty), `append`, or `overwrite` | `fill` |
+| `--note-mode` | `fill` (only if empty), `prepend`, `append`, or `overwrite` | `fill` |
 | `--no-shipments` | Match whole-order totals only | shipments on |
 | `--include-positive` | Also annotate refunds | off |
 | `--max-words-per-item`, `--max-items`, `--separator`, `--note-prefix`, `--max-length` | Note formatting | — |

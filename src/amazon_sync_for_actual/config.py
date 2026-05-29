@@ -76,7 +76,7 @@ class Config:
     include_positive: bool = False
 
     # --- Memo rendering ----------------------------------------------------
-    note_mode: str = "fill"  # "fill" | "append" | "overwrite"
+    note_mode: str = "fill"  # "fill" | "prepend" | "append" | "overwrite"
     max_words_per_item: int = 8
     max_items: int = 0
     separator: str = " | "
@@ -109,9 +109,10 @@ class Config:
         problems: List[str] = []
         if self.source not in ("csv", "selenium"):
             problems.append(f"Unknown source {self.source!r} (expected 'csv' or 'selenium').")
-        if self.note_mode not in ("fill", "append", "overwrite"):
+        if self.note_mode not in ("fill", "prepend", "append", "overwrite"):
             problems.append(
-                f"Unknown note_mode {self.note_mode!r} (expected fill/append/overwrite)."
+                f"Unknown note_mode {self.note_mode!r} "
+                "(expected fill/prepend/append/overwrite)."
             )
         if self.source == "csv" and not self.csv_path:
             problems.append("source=csv requires --csv / csv_path to be set.")
