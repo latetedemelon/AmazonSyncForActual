@@ -108,6 +108,13 @@ def build_parser() -> argparse.ArgumentParser:
     # Memo
     g = p.add_argument_group("Memo / notes")
     g.add_argument(
+        "--split-mode",
+        choices=["off", "items"],
+        dest="split_mode",
+        help="off (note only, default) or items (split a matched transaction into "
+             "one child per item, only when item amounts reconcile exactly).",
+    )
+    g.add_argument(
         "--note-mode",
         choices=["fill", "prepend", "append", "overwrite"],
         dest="note_mode",
@@ -134,7 +141,7 @@ def _overrides_from_args(args: argparse.Namespace) -> dict:
         "amazon_otp_secret", "selenium_pages",
         "days", "start_date", "end_date", "date_window_days", "tolerance_cents",
         "payee_regex", "match_shipments", "include_positive",
-        "note_mode", "max_words_per_item", "max_items", "separator",
+        "split_mode", "note_mode", "max_words_per_item", "max_items", "separator",
         "include_quantity", "note_prefix", "max_length",
         "bridge_host", "bridge_port", "bridge_token",
         "dry_run", "verbose",
@@ -173,6 +180,16 @@ def _print_plan(result) -> None:
         print(f"[{marker}] {date}  {cents_to_str(t.amount_cents, '$'):>10}  {t.payee_name}")
         if update.changes:
             print(f"           -> {update.new_notes}")
+    for split in getattr(result, "splits", []):
+        t = split.txn
+        date = t.date.isoformat() if t.date else "????-??-??"
+        if split.changes:
+            print(f"[SPLIT ] {date}  {cents_to_str(t.amount_cents, '$'):>10}  {t.payee_name}")
+            for child in split.children:
+                print(f"           -> {cents_to_str(child.amount_cents, '$'):>10}  {child.notes}")
+        else:
+            print(f"[nosplit] {date}  {cents_to_str(t.amount_cents, '$'):>10}  "
+                  f"{t.payee_name}  ({split.reason})")
     if result.unmatched_txns:
         print(f"\n{len(result.unmatched_txns)} Amazon transaction(s) had no matching order.")
     print("\nSummary:", result.summary())

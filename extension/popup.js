@@ -102,39 +102,124 @@ async function activeTab() {
   return tabs[0];
 }
 
-// Live progress pushed from the content script during a multi-page walk.
-chrome.runtime.onMessage.addListener(function (msg) {
-  if (!msg || msg.type !== "SCAN_PROGRESS") return;
-  var d = msg.detail || {};
-  if (d.phase === "filter") {
-    setStatus("Scanning " + d.label + " (" + d.index + "/" + d.of + ")…");
-  } else if (d.label) {
-    setStatus("Scanning " + d.label + " — page " + (d.page || "?") + ", " + (d.total || 0) + " orders…");
-  } else {
-    setStatus("Scanning page " + (d.page || "?") + " — " + (d.total || 0) + " orders so far…");
-  }
-});
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-async function scan(type, opts) {
-  opts = opts || {};
-  var tab = await activeTab();
-  if (!tab || !/(^|\.)amazon\./.test(new URL(tab.url || "http://x").hostname)) {
-    setStatus("Open your Amazon Orders page first.", "error");
-    return;
+function isAmazon(tab) {
+  try { return /(^|\.)amazon\./.test(new URL(tab.url || "http://x").hostname); }
+  catch (e) { return false; }
+}
+
+// Ask the content script in `tabId` to scrape the current (rendered) page.
+// Retries briefly so a freshly-navigated tab has time to inject + render.
+async function scrapeTab(tabId, type) {
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, { type: type || "SCRAPE_PAGE" });
+    } catch (e) {
+      await sleep(700); // content script may not be ready yet
+    }
   }
-  setStatus(type === "SCAN_PAGE" ? "Scanning…" : "Scanning (auto-walking pages)…");
+  throw new Error("content script unavailable");
+}
+
+// Navigate `tabId` to `url` and resolve once it has finished loading.
+function navigate(tabId, url) {
+  return new Promise(function (resolve) {
+    function listener(id, info) {
+      if (id === tabId && info.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(listener);
+    chrome.tabs.update(tabId, { url: url });
+  });
+}
+
+var DELAY_BETWEEN_PAGES_MS = 900; // polite pause between navigations
+var HARD_PAGE_CAP = 200;
+
+// Single page (no navigation).
+async function scanThisPage() {
+  var tab = await activeTab();
+  if (!tab || !isAmazon(tab)) return setStatus("Open your Amazon Orders page first.", "error");
+  setStatus("Scanning…");
   try {
-    var resp = await chrome.tabs.sendMessage(tab.id, Object.assign({ type: type }, opts));
-    var found = (resp && resp.orders) || [];
+    var r = await scrapeTab(tab.id, "SCAN_PAGE");
+    var found = (r && r.orders) || [];
     orders = ASFA.mergeOrders(orders, found);
-    await save();
-    render();
-    var note = resp && resp.error ? " (stopped: " + resp.error + ")" : "";
-    setStatus("Found " + found.length + " order(s) this scan; " + orders.length + " total." + note,
+    await save(); render();
+    setStatus("Found " + found.length + " order(s); " + orders.length + " total.", "ok");
+  } catch (e) {
+    setStatus("Couldn't scan. Reload the Orders page and retry.", "error");
+  }
+}
+
+// Walk every page of the *current* view by navigating the tab through the
+// real next-page URLs (so Amazon renders each page) and scraping the live DOM.
+async function walkPages(tabId, startUrl) {
+  var collected = [];
+  var url = startUrl || null;       // null => start from current page
+  var seen = {};
+  for (var page = 1; page <= HARD_PAGE_CAP; page++) {
+    if (url) { await navigate(tabId, url); await sleep(400); }
+    var r;
+    try { r = await scrapeTab(tabId, "SCRAPE_PAGE"); }
+    catch (e) { break; }
+    var found = (r && r.orders) || [];
+    collected = ASFA.mergeOrders(collected, found);
+    setStatus("Page " + page + " — " + collected.length + " orders so far…");
+
+    var nextUrl = r && r.nextUrl;
+    if (!nextUrl || seen[nextUrl]) break;
+    seen[nextUrl] = true;
+    url = nextUrl;
+    await sleep(DELAY_BETWEEN_PAGES_MS);
+  }
+  return collected;
+}
+
+async function scanAllPages() {
+  var tab = await activeTab();
+  if (!tab || !isAmazon(tab)) return setStatus("Open your Amazon Orders page first.", "error");
+  setStatus("Auto-walking pages…");
+  try {
+    var found = await walkPages(tab.id, null);
+    orders = ASFA.mergeOrders(orders, found);
+    await save(); render();
+    setStatus("Collected " + found.length + " order(s) across pages; " + orders.length + " total.",
       "ok");
   } catch (e) {
-    setStatus("Couldn't scan. Make sure you're on the Orders page and reload it, then retry.",
-      "error");
+    setStatus("Scan stopped: " + e.message, "error");
+  }
+}
+
+async function scanEverything() {
+  var tab = await activeTab();
+  if (!tab || !isAmazon(tab)) return setStatus("Open your Amazon Orders page first.", "error");
+  setStatus("Reading available years…");
+  var filters;
+  try {
+    var fr = await scrapeTab(tab.id, "LIST_FILTERS");
+    filters = (fr && fr.filters) || [];
+  } catch (e) { filters = []; }
+
+  try {
+    if (!filters.length) { return scanAllPages(); }
+    var base = new URL(tab.url);
+    for (var i = 0; i < filters.length; i++) {
+      var u = new URL(base.toString());
+      u.searchParams.set("orderFilter", filters[i].value);
+      u.searchParams.set("startIndex", "0");
+      setStatus("Scanning " + filters[i].label + " (" + (i + 1) + "/" + filters.length + ")…");
+      var found = await walkPages(tab.id, u.toString());
+      orders = ASFA.mergeOrders(orders, found);
+      await save(); render();
+    }
+    setStatus("Done. Collected " + orders.length + " order(s) across " + filters.length +
+      " period(s).", "ok");
+  } catch (e) {
+    setStatus("Scan stopped: " + e.message, "error");
   }
 }
 
@@ -152,9 +237,9 @@ function download(content, filename, mime) {
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
-$("scan").addEventListener("click", function () { scan("SCAN_PAGE"); });
-$("scanall").addEventListener("click", function () { scan("SCAN_ALL", {}); });
-$("scaneverything").addEventListener("click", function () { scan("SCAN_EVERYTHING", {}); });
+$("scan").addEventListener("click", scanThisPage);
+$("scanall").addEventListener("click", scanAllPages);
+$("scaneverything").addEventListener("click", scanEverything);
 $("csv").addEventListener("click", function () {
   if (!orders.length) return setStatus("Nothing collected yet.");
   download(ASFA.ordersToCsv(orders), "amazon-orders-" + today() + ".csv", "text/csv");

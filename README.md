@@ -32,6 +32,13 @@ After:   2024-01-11   -$43.76   Amazon.com   "Glad Tall Kitchen Trash Bags | Cre
    `--note-mode` you can instead `prepend`, `append`, or `overwrite`. Every mode
    is idempotent — re-running makes no duplicate changes.
 
+   Alternatively, `--split-mode items` turns a matched transaction into a
+   **split** — one child subtransaction per item, each carrying that item's name
+   (and ready for its own category). To keep your books balanced this only
+   happens when the item amounts reconcile to the charge **exactly** (i.e. the
+   data has real per-item prices, as in the "Request My Data" export); otherwise
+   it falls back to a single note. Already-split transactions are left untouched.
+
 The data-wrangling core (parsing, matching, memo building) has no heavy
 dependencies and is fully unit-tested. `actualpy` and `selenium` are imported
 lazily, so importing the package never requires them.
@@ -148,6 +155,7 @@ are still recognized for backwards compatibility.
 | `--tolerance-cents N` | Allowed rounding difference when matching totals | 0 |
 | `--payee-regex RE` | Which payees count as Amazon | `amazon\|amzn\|…` |
 | `--note-mode` | `fill` (only if empty), `prepend`, `append`, or `overwrite` | `fill` |
+| `--split-mode` | `off`, or `items` to split a matched transaction into one child per item (only when item amounts reconcile exactly; otherwise falls back to a note) | `off` |
 | `--no-shipments` | Match whole-order totals only | shipments on |
 | `--include-positive` | Also annotate refunds | off |
 | `--max-words-per-item`, `--max-items`, `--separator`, `--note-prefix`, `--max-length` | Note formatting | — |

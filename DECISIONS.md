@@ -238,3 +238,39 @@ export and the extension.
   `cryptography` here — it installs cleanly in a fresh venv/CI). All offline
   unit tests pass; the live connect/commit path is covered by reading and mirrors
   actualpy's documented API.
+
+## Per-item split transactions (opt-in)
+
+`--split-mode items` turns a matched transaction into an Actual **split**: one
+child subtransaction per order item (each with the item name as its note), using
+actualpy's `create_split` against the matched parent.
+
+- **Exact-only (per the user's choice).** A split is only produced when the
+  items' `total_cents` reconcile to the charge within `tolerance_cents`; the last
+  cent is force-balanced (`balance_amounts`) so children always sum to the
+  parent. When per-item prices are unknown (e.g. browser-extension data that only
+  knows the order total), the planner returns `not-exact` and the transaction
+  falls back to a note — never inventing amounts.
+- **Non-destructive & idempotent.** Already-split parents are skipped
+  (`skip-already`); single-item orders are skipped (`skip-single`). Split txns are
+  removed from note planning so we never double-write.
+- **Pure planner.** `splitting.py` (`plan_split`/`plan_splits`/`balance_amounts`)
+  is dependency-free and unit-tested; only the thin writer in `actual_sync`
+  touches actualpy. The write path was validated against real actualpy 0.22.2
+  (children summed exactly to the parent, flagged `is_child`).
+
+## Auto-scroll must navigate, not fetch (regression caught by diagnostics)
+
+The first auto-scroll implementation fetched each page's raw HTML and parsed it.
+A user's diagnostics report then showed order-extraction collapsing from 100% to
+~5% across 57 pages, with failing cards carrying only `[order-card,
+js-order-card]` classes. Root cause: **Amazon renders order cards client-side**,
+so fetched HTML is empty shells.
+
+Fix: the popup now **navigates the real tab** through next-page URLs (letting
+Amazon's JS render each page) and the content script scrapes the live DOM after a
+`waitForRender`. Empty shells are counted separately (`coverage.emptyShells`) and
+excluded from coverage/failures so a pre-render scrape can't skew diagnostics.
+This needed `tabs`/`scripting` permissions and a navigation-driven popup loop
+(`walkPages`). The episode is the clearest possible validation of building the
+diagnostics layer first.

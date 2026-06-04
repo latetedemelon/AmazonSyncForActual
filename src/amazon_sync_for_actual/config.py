@@ -75,6 +75,12 @@ class Config:
     match_shipments: bool = True
     include_positive: bool = False
 
+    # --- Splitting ---------------------------------------------------------
+    # "off"   -> never split; just write notes (default, backwards compatible)
+    # "items" -> split a matched transaction into one child per item, but ONLY
+    #            when item amounts reconcile exactly; otherwise fall back to notes
+    split_mode: str = "off"
+
     # --- Memo rendering ----------------------------------------------------
     note_mode: str = "fill"  # "fill" | "prepend" | "append" | "overwrite"
     max_words_per_item: int = 8
@@ -121,6 +127,10 @@ class Config:
                 f"Unknown note_mode {self.note_mode!r} "
                 "(expected fill/prepend/append/overwrite)."
             )
+        if self.split_mode not in ("off", "items"):
+            problems.append(
+                f"Unknown split_mode {self.split_mode!r} (expected off/items)."
+            )
         if self.source in ("csv", "json") and not self.csv_path:
             problems.append(f"source={self.source} requires --csv / csv_path to be set.")
         if self.source == "selenium" and not (self.amazon_email and self.amazon_password):
@@ -151,6 +161,7 @@ _SPECS: List[_FieldSpec] = [
     ("payee_regex", str, "matching", "payee_regex", "ASFA_PAYEE_REGEX"),
     ("match_shipments", _as_bool, "matching", "match_shipments", "ASFA_MATCH_SHIPMENTS"),
     ("include_positive", _as_bool, "matching", "include_positive", "ASFA_INCLUDE_POSITIVE"),
+    ("split_mode", str, "memo", "split_mode", "ASFA_SPLIT_MODE"),
     ("note_mode", str, "memo", "mode", "ASFA_NOTE_MODE"),
     ("max_words_per_item", int, "memo", "max_words_per_item", "ASFA_MAX_WORDS_PER_ITEM"),
     ("max_items", int, "memo", "max_items", "ASFA_MAX_ITEMS"),

@@ -84,3 +84,29 @@ def test_syncer_plan_end_to_end():
     assert len(changed) == 1
     assert changed[0].txn.id == 1
     assert "Widget" in changed[0].new_notes and "Gadget" in changed[0].new_notes
+
+
+def test_split_mode_items_splits_exact_and_notes_the_rest():
+    # Order 1: two priced items summing to the charge -> split.
+    o1 = AmazonOrder(order_id="A", order_date=date(2024, 1, 10))
+    o1.add_item(AmazonItem(name="Widget", total_cents=1000))
+    o1.add_item(AmazonItem(name="Gadget", total_cents=500))
+    # Order 2: order-total-only (no per-item prices) -> falls back to a note.
+    o2 = AmazonOrder(order_id="B", order_date=date(2024, 1, 10))
+    o2.add_item(AmazonItem(name="Foo", total_cents=0))
+    o2.add_item(AmazonItem(name="Bar", total_cents=0))
+    o2.total_override_cents = 2000
+    txns = [
+        TxnView(id=1, amount_cents=-1500, date=date(2024, 1, 11), payee_name="Amazon"),
+        TxnView(id=2, amount_cents=-2000, date=date(2024, 1, 11), payee_name="Amazon"),
+    ]
+    result = ActualSyncer(Config(split_mode="items"))._plan([o1, o2], txns)
+
+    # Exactly one split (order A) and one note fallback (order B).
+    assert len(result.changed_splits) == 1
+    split = result.changed_splits[0]
+    assert split.txn.id == 1
+    assert sum(c.amount_cents for c in split.children) == -1500
+    # The split txn is NOT also in the note updates (no double-write).
+    assert all(u.txn.id != 1 for u in result.changed)
+    assert any(u.txn.id == 2 and u.changes for u in result.updates)

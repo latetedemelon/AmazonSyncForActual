@@ -46,6 +46,7 @@ class Update:
 @dataclass
 class SyncResult:
     updates: List[Update] = field(default_factory=list)
+    splits: List["object"] = field(default_factory=list)  # List[SplitPlan]
     unmatched_txns: List[TxnView] = field(default_factory=list)
     unmatched_orders: List[AmazonOrder] = field(default_factory=list)
     committed: bool = False
@@ -54,14 +55,23 @@ class SyncResult:
     def changed(self) -> List[Update]:
         return [u for u in self.updates if u.changes]
 
+    @property
+    def changed_splits(self) -> List["object"]:
+        return [s for s in self.splits if getattr(s, "changes", False)]
+
     def summary(self) -> str:
         writes = sum(1 for u in self.updates if u.action == "write")
         appends = sum(1 for u in self.updates if u.action == "append")
         prepends = sum(1 for u in self.updates if u.action == "prepend")
         skipped = len(self.updates) - writes - appends - prepends
+        split_note = ""
+        if self.splits:
+            n_split = len(self.changed_splits)
+            split_note = f" split={n_split}/{len(self.splits)}"
         return (
             f"matched={len(self.updates)} "
-            f"write={writes} prepend={prepends} append={appends} skipped={skipped} "
+            f"write={writes} prepend={prepends} append={appends} skipped={skipped}"
+            f"{split_note} "
             f"unmatched_txns={len(self.unmatched_txns)} "
             f"unmatched_orders={len(self.unmatched_orders)} "
             f"committed={self.committed}"
@@ -178,16 +188,37 @@ class ActualSyncer:
 
             result = self._plan(orders, txns)
 
-            if result.changed and not cfg.dry_run:
+            has_changes = bool(result.changed or result.changed_splits)
+            if has_changes and not cfg.dry_run:
                 for update in result.changed:
                     update.txn.raw.notes = update.new_notes
+                if result.changed_splits:
+                    self._write_splits(actual.session, result.changed_splits)
                 actual.commit()
                 result.committed = True
-                log.info("Committed %d note update(s) to Actual", len(result.changed))
+                log.info(
+                    "Committed %d note update(s) and %d split(s) to Actual",
+                    len(result.changed), len(result.changed_splits),
+                )
             elif cfg.dry_run:
-                log.info("Dry-run: %d change(s) NOT written", len(result.changed))
+                log.info(
+                    "Dry-run: %d note change(s) and %d split(s) NOT written",
+                    len(result.changed), len(result.changed_splits),
+                )
 
         return result
+
+    def _write_splits(self, session, split_plans) -> None:
+        """Turn each planned split's parent transaction into child subtransactions."""
+        from actual.queries import create_split
+
+        for plan in split_plans:
+            parent = plan.txn.raw
+            for child in plan.children:
+                from decimal import Decimal
+
+                sub = create_split(session, parent, Decimal(child.amount_cents) / 100)
+                sub.notes = child.notes
 
     def _plan(self, orders: Sequence[AmazonOrder], txns: Sequence[TxnView]) -> SyncResult:
         """The Actual-independent core of :meth:`run` (handy for testing)."""
@@ -201,9 +232,27 @@ class ActualSyncer:
             match_shipments=cfg.match_shipments,
             include_positive=cfg.include_positive,
         )
-        updates = plan_updates(match_result.matches, cfg.memo_options(), cfg.note_mode)
+
+        splits: List["object"] = []
+        note_matches = list(match_result.matches)
+
+        if cfg.split_mode == "items":
+            from .splitting import plan_splits
+
+            splits = plan_splits(
+                match_result.matches, cfg.memo_options(),
+                tolerance_cents=cfg.tolerance_cents,
+            )
+            # Only matches that will actually be split are removed from note
+            # planning; everything else (single-item, not-exact, already-split)
+            # falls back to a note so we never silently do nothing.
+            split_txn_ids = {id(s.txn) for s in splits if s.changes}
+            note_matches = [m for m in match_result.matches if id(m.txn) not in split_txn_ids]
+
+        updates = plan_updates(note_matches, cfg.memo_options(), cfg.note_mode)
         return SyncResult(
             updates=updates,
+            splits=splits,
             unmatched_txns=match_result.unmatched_txns,
             unmatched_orders=match_result.unmatched_orders,
         )

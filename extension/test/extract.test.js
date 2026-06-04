@@ -105,3 +105,17 @@ test("extractOrderId matches physical and digital order ids",
       extractOrderId(card('<a href="/order-details?orderID=D01-7654321-7654321">x</a>')),
       "D01-7654321-7654321");
   });
+
+test("empty unrendered shells are not counted as coverage failures",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    // Two empty order-card shells (client-side not rendered) + nothing else.
+    const doc = new JSDOM(`<div class="your-orders-content">
+      <div class="order-card js-order-card"></div>
+      <div class="order-card js-order-card"></div>
+    </div>`).window.document;
+    const res = extractOrdersFromDocument(doc, { host: "amazon.ca", diagnostics: true });
+    assert.equal(res.orders.length, 0);
+    assert.equal(res.report.coverage.cards, 0);      // no *rendered* cards
+    assert.equal(res.report.coverage.emptyShells, 2); // tracked separately
+    assert.equal(res.report.fieldFailures.length, 0); // not counted as failures
+  });
