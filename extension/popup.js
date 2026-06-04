@@ -20,11 +20,41 @@ var DEFAULT_SETTINGS = {
 };
 var settings = Object.assign({}, DEFAULT_SETTINGS);
 
+function money(cents) {
+  if (!cents) return "$0.00";
+  return "$" + (Math.abs(cents) / 100).toFixed(2);
+}
+
+function renderByYear() {
+  var body = $("byyear-body");
+  if (!body) return;
+  body.innerHTML = "";
+  if (!orders.length) {
+    body.innerHTML = '<tr class="empty"><td colspan="4">No orders collected yet.</td></tr>';
+    return;
+  }
+  var summary = ASFA.summarizeOrdersByYear(orders);
+  summary.rows.forEach(function (r) {
+    var tr = document.createElement("tr");
+    var label = r.year === "unknown" ? "(no date)" : r.year;
+    tr.innerHTML = "<td>" + label + "</td><td>" + r.orders + "</td><td>" +
+      r.items + "</td><td>" + money(r.totalCents) + "</td>";
+    body.appendChild(tr);
+  });
+  var t = summary.totals;
+  var totals = document.createElement("tr");
+  totals.className = "totals";
+  totals.innerHTML = "<td>All</td><td>" + t.orders + "</td><td>" + t.items +
+    "</td><td>" + money(t.totalCents) + "</td>";
+  body.appendChild(totals);
+}
+
 function render() {
   $("count").textContent = orders.length;
   $("items").textContent = orders.reduce(function (n, o) {
     return n + (o.items ? o.items.length : 0);
   }, 0);
+  renderByYear();
 }
 
 async function load() {

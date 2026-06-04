@@ -145,3 +145,27 @@ test("applyTimeFilter sets both params and resets startIndex",
     assert.ok(out.includes("orderFilter=year-2024"));
     assert.ok(out.includes("startIndex=0"));
   });
+
+test("summarizeOrdersByYear buckets by year, newest first, with totals", () => {
+  const orders = [
+    { orderDate: "2025-03-01", orderTotalCents: 1000, items: [{}, {}] },
+    { orderDate: "2025-11-15", orderTotalCents: 2500, items: [{}] },
+    { orderDate: "2024-06-01", orderTotalCents: 500, items: [{}] },
+    { orderDate: "", orderTotalCents: null, items: [] },          // unknown date
+    { orderDate: "2024-01-10T08:00:00Z", orderTotalCents: 700, items: [{}] },
+  ];
+  const s = A.summarizeOrdersByYear(orders);
+  assert.deepEqual(s.rows.map((r) => r.year), ["2025", "2024", "unknown"]);
+  const y2025 = s.rows.find((r) => r.year === "2025");
+  assert.equal(y2025.orders, 2);
+  assert.equal(y2025.items, 3);
+  assert.equal(y2025.totalCents, 3500);
+  assert.equal(s.totals.orders, 5);
+  assert.equal(s.totals.totalCents, 4700);
+});
+
+test("summarizeOrdersByYear handles empty input", () => {
+  const s = A.summarizeOrdersByYear([]);
+  assert.deepEqual(s.rows, []);
+  assert.equal(s.totals.orders, 0);
+});

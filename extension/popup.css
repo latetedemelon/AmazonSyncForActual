@@ -24,6 +24,14 @@ h1 { font-size: 15px; margin: 0; }
 .stats div { flex: 1; text-align: center; }
 .stats span { display: block; font-size: 20px; font-weight: 700; }
 .stats label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+details#byyear { margin: 8px 14px 0; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px 8px; }
+details#byyear summary { cursor: pointer; font-weight: 600; font-size: 12px; padding: 4px 0; }
+#byyear-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#byyear-table th, #byyear-table td { padding: 3px 4px; text-align: right; }
+#byyear-table th:first-child, #byyear-table td:first-child { text-align: left; }
+#byyear-table thead th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); }
+#byyear-table tr.totals td { border-top: 1px solid var(--line); font-weight: 700; }
+#byyear-table tr.empty td { color: var(--muted); text-align: center; padding: 8px 0; }
 .actions { display: flex; gap: 8px; padding: 8px 14px 0; }
 button {
   flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;

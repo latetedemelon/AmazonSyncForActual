@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Amazon Sync for Actual",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Gather your Amazon order details and export a CSV for Amazon Sync for Actual (Actual Budget). Works on all English Amazon marketplaces.",
   "permissions": [
     "storage",

@@ -295,6 +295,32 @@
     return orderKeys.map(function (k) { return map.get(k); });
   }
 
+  // Summarize collected orders by calendar year: count, summed total (cents),
+  // and item count. Orders with no/!parseable date are bucketed under "unknown".
+  // Returns rows sorted newest-year-first, with "unknown" last, plus a totals row.
+  function summarizeOrdersByYear(orders) {
+    var byYear = {};
+    (orders || []).forEach(function (o) {
+      var d = normalizeDate(o.orderDate);
+      var year = /^\d{4}-/.test(d) ? d.slice(0, 4) : "unknown";
+      var bucket = byYear[year] || (byYear[year] = { year: year, orders: 0, items: 0, totalCents: 0 });
+      bucket.orders += 1;
+      bucket.items += (o.items && o.items.length) || 0;
+      if (o.orderTotalCents != null) bucket.totalCents += o.orderTotalCents;
+    });
+    var rows = Object.keys(byYear).map(function (y) { return byYear[y]; });
+    rows.sort(function (a, b) {
+      if (a.year === "unknown") return 1;
+      if (b.year === "unknown") return -1;
+      return b.year < a.year ? -1 : (b.year > a.year ? 1 : 0); // newest first
+    });
+    var totals = rows.reduce(function (acc, r) {
+      acc.orders += r.orders; acc.items += r.items; acc.totalCents += r.totalCents;
+      return acc;
+    }, { year: "all", orders: 0, items: 0, totalCents: 0 });
+    return { rows: rows, totals: totals };
+  }
+
   // Build the option overrides sent to the bridge from popup settings. Only
   // non-empty values are included so the server keeps its own defaults.
   function buildBridgeOptions(settings) {
@@ -320,6 +346,7 @@
     csvEscape: csvEscape,
     ordersToCsv: ordersToCsv,
     mergeOrders: mergeOrders,
+    summarizeOrdersByYear: summarizeOrdersByYear,
     nextStartIndex: nextStartIndex,
     findTimeFilters: findTimeFilters,
     applyTimeFilter: applyTimeFilter,

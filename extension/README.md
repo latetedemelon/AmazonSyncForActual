@@ -61,7 +61,10 @@ ZIP — that's a separate listing step.)
    - **Scan entire history (all years)** — walks every time filter (each year and
      the rolling windows) and every page within, collecting the whole account in
      one go.
-   Scans accumulate and de-duplicate, so you can combine them safely.
+   Scans accumulate and de-duplicate, so you can combine them safely. The
+   **Per-year summary** in the popup updates live (orders / items / total per
+   calendar year) so you can confirm coverage — e.g. spot a year that didn't get
+   scanned.
 3. Click **Download CSV**.
 4. Feed it to the tool (preview first):
 
