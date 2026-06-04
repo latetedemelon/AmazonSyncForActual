@@ -61,6 +61,25 @@ def test_zip_source(tmp_path):
     assert any(o.order_id == "113-2222222-2222222" for o in orders)
 
 
+def test_zero_dollar_no_id_junk_order_dropped():
+    # A $0 digital promo with no order id (e.g. "Alexa+") is junk that can never
+    # reconcile, so it is dropped...
+    rows = [{"Order ID": "", "Order Date": "1970-01-01", "Product Name": "Alexa+",
+             "Quantity": "1", "Order Total": "0.00", "Currency": "CAD"}]
+    assert rows_to_orders(rows) == []
+
+
+def test_zero_dollar_order_with_real_id_is_kept():
+    # ...but a $0 order that *has* a real order id is preserved (it may pair with
+    # a separately-charged shipment, and is not synthetic junk).
+    rows = [{"Order ID": "114-3333333-3333333", "Order Date": "2024-03-01",
+             "Product Name": "Kindle eBook A Free Sample", "Quantity": "1",
+             "Order Total": "0.00", "Currency": "USD"}]
+    orders = rows_to_orders(rows)
+    assert len(orders) == 1
+    assert orders[0].order_id == "114-3333333-3333333"
+
+
 def test_unit_price_fallback_when_total_missing():
     rows = [{"Order ID": "X", "Product Name": "Thing", "Unit Price": "5.00",
              "Unit Price Tax": "0.50", "Quantity": "2", "Order Date": "2024-01-01"}]

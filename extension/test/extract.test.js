@@ -11,7 +11,7 @@ try {
   JSDOM = null;
 }
 
-const { extractOrdersFromDocument } = require("../content.js");
+const { extractOrdersFromDocument, extractOrderId } = require("../content.js");
 
 function docFrom(fixture) {
   const html = fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8");
@@ -86,4 +86,22 @@ test("diagnostics records redacted failures for a broken card",
     // ...but the real amount "99.95" must never appear; only its shape may.
     const blob = JSON.stringify(report);
     assert.ok(!/99\.95/.test(blob), "raw amount must not leak");
+  });
+
+test("extractOrderId matches physical and digital order ids",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    function card(html) {
+      return new JSDOM("<div class='order-card'>" + html + "</div>").window.document
+        .querySelector(".order-card");
+    }
+    // Physical (3-7-7)
+    assert.equal(extractOrderId(card("<span>701-7822882-8615449</span>")),
+      "701-7822882-8615449");
+    // Digital, letter-prefixed (e.g. Kindle/Alexa/app store)
+    assert.equal(extractOrderId(card("<span>Order # D01-1234567-1234567</span>")),
+      "D01-1234567-1234567");
+    // From an href fallback with a letter-prefixed id
+    assert.equal(
+      extractOrderId(card('<a href="/order-details?orderID=D01-7654321-7654321">x</a>')),
+      "D01-7654321-7654321");
   });

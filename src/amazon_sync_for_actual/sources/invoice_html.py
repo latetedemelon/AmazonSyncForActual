@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 __all__ = ["parse_invoice"]
 
 _ORDER_PLACED = re.compile(r"Order Placed:\s*(.+)", re.IGNORECASE)
-_ORDER_NUMBER = re.compile(r"order number:\s*([0-9-]+)", re.IGNORECASE)
+_ORDER_NUMBER = re.compile(r"order number:\s*([A-Z0-9-]+)", re.IGNORECASE)
 _LEADING_INT = re.compile(r"^\s*(\d+)")
 
 

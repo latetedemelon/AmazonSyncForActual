@@ -24,7 +24,10 @@
   // field: these are the structural hooks we'd use to repair selectors.
   var INTERESTING_CLASS_RE = /(order|total|price|date|placed|item|qty|quantity|ship|delivery|product|card|grid)/i;
 
-  var ORDER_ID_RE = /\b\d{3}-\d{7}-\d{7}\b/;
+  // Physical orders are 3-7-7 digits; digital orders (Kindle, Alexa, apps) use a
+  // letter-prefixed group like "D01-1234567-1234567". Accept up to 3 leading
+  // letters so digital orders aren't dropped.
+  var ORDER_ID_RE = /\b[A-Z]{0,3}\d{1,3}-\d{7}-\d{7}\b/i;
   var ASIN_RE = /\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i;
   var PRODUCT_HREF_RE = /\/(?:dp|gp\/product|product)\//;
 
@@ -125,7 +128,7 @@
     var links = card.querySelectorAll('a[href]');
     for (var i = 0; i < links.length; i++) {
       var href = links[i].getAttribute("href") || "";
-      var m = href.match(/order(?:ID|Id|_id)=([0-9-]+)/i);
+      var m = href.match(/order(?:ID|Id|_id)=([A-Z0-9-]+)/i);
       if (m) return m[1];
     }
     return "";

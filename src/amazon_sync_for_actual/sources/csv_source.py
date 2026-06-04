@@ -145,7 +145,14 @@ def rows_to_orders(rows: List[Dict[str, str]]) -> List[AmazonOrder]:
                 )
             )
 
-    return [orders[oid] for oid in order_sequence]
+    # Drop clear junk: a synthetic-id order (the source gave no order id) that
+    # also has no money. These are typically $0 digital promos (e.g. "Alexa+")
+    # that can never reconcile against a transaction anyway.
+    return [
+        orders[oid]
+        for oid in order_sequence
+        if not (oid.startswith("_no_order_") and orders[oid].total_cents == 0)
+    ]
 
 
 def _read_csv_text(text: str) -> List[Dict[str, str]]:
