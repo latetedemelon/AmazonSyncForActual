@@ -306,8 +306,19 @@
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  // Detect a legitimate "no orders in this period" empty state, so an empty year
+  // resolves immediately instead of waiting the full render timeout.
+  var EMPTY_STATE_RE = /no orders|aucune commande|didn't place any orders|no se realizaron pedidos|keine bestellungen/i;
+  function looksEmpty() {
+    var main = document.querySelector(
+      "#ordersContainer, .your-orders-content-container, #yourOrders, .a-section"
+    ) || document.body;
+    return !!main && EMPTY_STATE_RE.test(text(main));
+  }
+
   // Wait until order cards have actually rendered (or a timeout), so we don't
-  // scrape an empty shell right after navigation.
+  // scrape an empty shell right after navigation. Returns early if the page
+  // clearly has no orders (empty year), so the walk doesn't stall.
   async function waitForRender(timeoutMs) {
     var deadline = Date.now() + (timeoutMs || 8000);
     while (Date.now() < deadline) {
@@ -322,6 +333,7 @@
           }
         }
       }
+      if (looksEmpty()) return false;  // genuine empty period — stop waiting
       await sleep(250);
     }
     return false;

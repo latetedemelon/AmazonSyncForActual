@@ -196,8 +196,12 @@
       if (doc.querySelector(".a-pagination li.a-last.a-disabled, .a-last.a-disabled")) {
         return null;
       }
+      // No pagination markup at all: only guess "next page" when this page is
+      // FULL (>= pageSize order cards). A short/empty page is the last one, so
+      // return null — this avoids paging forever past an empty/old year.
+      var cardCount = (doc.querySelectorAll(".order-card, .js-order-card") || []).length;
+      if (cardCount < pageSize) return null;
     }
-    // No pagination info: caller decides whether to try current + pageSize.
     return currentStart + pageSize;
   }
 

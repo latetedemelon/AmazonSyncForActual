@@ -106,10 +106,21 @@ test("nextStartIndex returns null on the last page", { skip: !JSDOM2 && "no jsdo
   assert.equal(A.nextStartIndex(doc, 20, 10), null);
 });
 
-test("nextStartIndex falls back to current+pageSize without pagination",
+test("nextStartIndex guesses next page only when the page is full",
   { skip: !JSDOM2 && "no jsdom" }, () => {
-    const doc = dom(`<div>no pagination here</div>`);
-    assert.equal(A.nextStartIndex(doc, 30, 10), 40);
+    // Full page (10 cards), no pagination markup -> guess current+pageSize.
+    var full = "<div>no pagination</div>" +
+      new Array(10).fill('<div class="order-card js-order-card">x</div>').join("");
+    assert.equal(A.nextStartIndex(dom(full), 30, 10), 40);
+  });
+
+test("nextStartIndex returns null on a short/empty last page (no infinite paging)",
+  { skip: !JSDOM2 && "no jsdom" }, () => {
+    // 3 cards on a page of 10, no pagination -> this is the last page.
+    var short = new Array(3).fill('<div class="order-card js-order-card">x</div>').join("");
+    assert.equal(A.nextStartIndex(dom(short), 0, 10), null);
+    // Completely empty (old/empty year) -> null, so the walk stops.
+    assert.equal(A.nextStartIndex(dom("<div>You have no orders in 2013.</div>"), 0, 10), null);
   });
 
 test("findTimeFilters reads window+year+archived options, years newest-first",

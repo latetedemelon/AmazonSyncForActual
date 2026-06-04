@@ -152,17 +152,31 @@ async function scrapeTab(tabId, type) {
   throw new Error("content script unavailable");
 }
 
-// Navigate `tabId` to `url` and resolve once it has finished loading.
-function navigate(tabId, url) {
+// Navigate `tabId` to `url` and resolve once it has finished loading, OR after
+// a timeout. The timeout is essential: navigations to old/empty year pages can
+// redirect or be served from cache such that the "complete" event is missed —
+// without a cap the whole walk would hang forever (this caused a freeze on an
+// empty year). We resolve anyway and let the scrape's own render-wait handle it.
+function navigate(tabId, url, timeoutMs) {
   return new Promise(function (resolve) {
+    var done = false;
+    function finish() {
+      if (done) return;
+      done = true;
+      chrome.tabs.onUpdated.removeListener(listener);
+      clearTimeout(timer);
+      resolve();
+    }
     function listener(id, info) {
-      if (id === tabId && info.status === "complete") {
-        chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
-      }
+      if (id === tabId && info.status === "complete") finish();
     }
     chrome.tabs.onUpdated.addListener(listener);
-    chrome.tabs.update(tabId, { url: url });
+    var timer = setTimeout(finish, timeoutMs || 15000);
+    try {
+      chrome.tabs.update(tabId, { url: url });
+    } catch (e) {
+      finish(); // tab gone / invalid url — don't hang
+    }
   });
 }
 
@@ -200,15 +214,24 @@ async function walkPages(tabId, startUrl, expectFilter) {
     try { r = await scrapeTab(tabId, "SCRAPE_PAGE"); }
     catch (e) { break; }
 
-    if (page === 1 && expectFilter && r && r.activeFilter &&
-        r.activeFilter !== expectFilter) {
-      // Amazon did not honor the requested period — don't double-count.
-      setStatus("Skipping period (filter not applied: wanted " + expectFilter +
-        ", got " + r.activeFilter + ")…");
-      return [];
+    // Guard against silently re-scraping the default year: only abort if the
+    // page reports a *different specific year* than requested. A missing/blank
+    // activeFilter (old pages don't always echo it) is tolerated so we don't
+    // wrongly skip a valid year.
+    if (page === 1 && expectFilter && r && r.activeFilter) {
+      var wantYear = /year-(\d{4})/.exec(expectFilter);
+      var gotYear = /year-(\d{4})/.exec(r.activeFilter);
+      if (wantYear && gotYear && wantYear[1] !== gotYear[1]) {
+        setStatus("Skipping " + expectFilter + " (page showed " + r.activeFilter + ")…");
+        return [];
+      }
     }
 
     var found = (r && r.orders) || [];
+    // An empty page means we've reached the end of this period (or it's an empty
+    // year). Stop paging rather than chase a fallback startIndex forever — this
+    // prevented a freeze when entering an old/empty year.
+    if (!found.length) break;
     collected = ASFA.mergeOrders(collected, found);
     setStatus("Page " + page + " — " + collected.length + " orders so far…");
 
