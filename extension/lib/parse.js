@@ -248,6 +248,18 @@
     return out;
   }
 
+  // Periods to scan for a *full history* run. The rolling windows (last 30 days,
+  // last 3 months, etc.) are strict subsets of the current year, so the year
+  // buckets already cover them — drop them to avoid redundant page walks. Keeps
+  // every year-NNNN bucket plus "archived"; falls back to all filters if there
+  // are somehow no year buckets (so we never scan nothing).
+  function fullHistoryFilters(filters) {
+    var kept = (filters || []).filter(function (f) {
+      return /^year-\d{4}$/.test(f.value) || f.value === "archived";
+    });
+    return kept.length ? kept : (filters || []);
+  }
+
   // Set every known time-filter query parameter on a URL so it works on both the
   // modern (/your-orders, "timeFilter") and legacy (/gp/css/order-history,
   // "orderFilter") order pages.
@@ -349,6 +361,7 @@
     summarizeOrdersByYear: summarizeOrdersByYear,
     nextStartIndex: nextStartIndex,
     findTimeFilters: findTimeFilters,
+    fullHistoryFilters: fullHistoryFilters,
     applyTimeFilter: applyTimeFilter,
     buildBridgeOptions: buildBridgeOptions
   };

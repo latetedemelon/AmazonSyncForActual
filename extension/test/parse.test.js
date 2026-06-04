@@ -169,3 +169,21 @@ test("summarizeOrdersByYear handles empty input", () => {
   assert.deepEqual(s.rows, []);
   assert.equal(s.totals.orders, 0);
 });
+
+test("fullHistoryFilters drops rolling windows, keeps years + archived", () => {
+  const filters = [
+    { label: "Last 3 months", value: "months-3" },
+    { label: "Last 30 days", value: "last30" },
+    { label: "2026", value: "year-2026" },
+    { label: "2025", value: "year-2025" },
+    { label: "Archived Orders", value: "archived" },
+  ];
+  const kept = A.fullHistoryFilters(filters).map((f) => f.value);
+  assert.deepEqual(kept, ["year-2026", "year-2025", "archived"]);
+});
+
+test("fullHistoryFilters falls back to all when no year buckets exist", () => {
+  const filters = [{ label: "Last 3 months", value: "months-3" }];
+  assert.deepEqual(A.fullHistoryFilters(filters).map((f) => f.value), ["months-3"]);
+  assert.deepEqual(A.fullHistoryFilters([]), []);
+});

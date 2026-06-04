@@ -251,16 +251,19 @@ async function scanEverything() {
       setStatus("No year filter found on this page; scanning current view only…");
       return scanAllPages();
     }
+    // The rolling windows (last 30 days / 3 months) are subsets of the current
+    // year, which we scan anyway — drop them to avoid redundant walks.
+    var periods = ASFA.fullHistoryFilters(filters);
     var before = orders.length;
-    for (var i = 0; i < filters.length; i++) {
-      var startUrl = ASFA.applyTimeFilter(tab.url, filters[i].value);
-      setStatus("Scanning " + filters[i].label + " (" + (i + 1) + "/" + filters.length + ")…");
-      var found = await walkPages(tab.id, startUrl, filters[i].value);
+    for (var i = 0; i < periods.length; i++) {
+      var startUrl = ASFA.applyTimeFilter(tab.url, periods[i].value);
+      setStatus("Scanning " + periods[i].label + " (" + (i + 1) + "/" + periods.length + ")…");
+      var found = await walkPages(tab.id, startUrl, periods[i].value);
       orders = ASFA.mergeOrders(orders, found);
       await save(); render();
     }
     setStatus("Done. Collected " + (orders.length - before) + " new order(s) across " +
-      filters.length + " period(s); " + orders.length + " total.", "ok");
+      periods.length + " period(s); " + orders.length + " total.", "ok");
   } catch (e) {
     setStatus("Scan stopped: " + e.message, "error");
   }
