@@ -202,27 +202,61 @@
   }
 
   // Discover the available time filters (years / "last 3 months") from the
-  // orders page's time-period dropdown, so a full scan can walk each one.
-  // Returns a de-duplicated list of {label, value} (value is the orderFilter).
+  // orders page, so a full scan can walk each one. Works regardless of how the
+  // dropdown is rendered: reads native <option> values AND any links/elements
+  // carrying a timeFilter=/orderFilter= value. Returns de-duplicated
+  // {label, value}. ``value`` is the filter token (e.g. "year-2024").
+  var TIME_FILTER_RE = /^(year-\d{4}|months-\d+|last30|archived)$/;
+
   function findTimeFilters(doc) {
     var out = [];
     var seen = {};
     if (!doc || !doc.querySelectorAll) return out;
-    var opts = doc.querySelectorAll(
-      'select#time-filter option, select[name="orderFilter"] option, ' +
-      'form[action*="order-history"] select option, [name="timeFilter"] option'
-    );
-    for (var i = 0; i < opts.length; i++) {
-      var value = opts[i].getAttribute("value") || "";
-      var label = (opts[i].textContent || "").replace(/\s+/g, " ").trim();
-      if (!value || seen[value]) continue;
-      // Keep year buckets and the rolling windows; skip the "archived" pseudo.
-      if (/^(year-\d{4}|months-\d+|last30|year-\d+)$/.test(value) || /^\d{4}$/.test(value)) {
-        seen[value] = true;
-        out.push({ label: label, value: value });
-      }
+
+    function add(value, label) {
+      value = (value || "").trim();
+      if (!value || seen[value] || !TIME_FILTER_RE.test(value)) return;
+      seen[value] = true;
+      out.push({ label: (label || value).replace(/\s+/g, " ").trim(), value: value });
     }
+
+    // 1. Native <option> elements (covers <select name="timeFilter"/"orderFilter">).
+    var opts = doc.querySelectorAll("option");
+    for (var i = 0; i < opts.length; i++) {
+      add(opts[i].getAttribute("value"), opts[i].textContent);
+    }
+    // 2. Links / elements whose href or data carries the filter token (covers
+    //    custom, non-<select> dropdowns rendered as menus).
+    var links = doc.querySelectorAll(
+      'a[href*="timeFilter="], a[href*="orderFilter="], [data-value]'
+    );
+    for (var j = 0; j < links.length; j++) {
+      var href = links[j].getAttribute("href") || "";
+      var m = href.match(/(?:timeFilter|orderFilter)=([^&]+)/);
+      var val = m ? decodeURIComponent(m[1]) : (links[j].getAttribute("data-value") || "");
+      add(val, links[j].textContent);
+    }
+
+    // Stable, useful order: rolling windows first, then years newest-first.
+    out.sort(function (a, b) {
+      var ay = a.value.match(/year-(\d{4})/), by = b.value.match(/year-(\d{4})/);
+      if (ay && by) return parseInt(by[1], 10) - parseInt(ay[1], 10);
+      if (ay && !by) return 1;            // years after windows
+      if (!ay && by) return -1;
+      return 0;
+    });
     return out;
+  }
+
+  // Set every known time-filter query parameter on a URL so it works on both the
+  // modern (/your-orders, "timeFilter") and legacy (/gp/css/order-history,
+  // "orderFilter") order pages.
+  function applyTimeFilter(urlStr, value) {
+    var u = new URL(urlStr);
+    u.searchParams.set("timeFilter", value);
+    u.searchParams.set("orderFilter", value);
+    u.searchParams.set("startIndex", "0");
+    return u.toString();
   }
 
   // Combine order lists, de-duplicating by order id (and items by ASIN/name) so
@@ -288,6 +322,7 @@
     mergeOrders: mergeOrders,
     nextStartIndex: nextStartIndex,
     findTimeFilters: findTimeFilters,
+    applyTimeFilter: applyTimeFilter,
     buildBridgeOptions: buildBridgeOptions
   };
 

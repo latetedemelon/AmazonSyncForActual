@@ -157,7 +157,10 @@ async function scanThisPage() {
 
 // Walk every page of the *current* view by navigating the tab through the
 // real next-page URLs (so Amazon renders each page) and scraping the live DOM.
-async function walkPages(tabId, startUrl) {
+// If `expectFilter` is given, the first page must report that active filter,
+// otherwise we abort this period rather than silently re-scrape the default
+// year (Amazon ignores an unknown time-filter param and keeps the default).
+async function walkPages(tabId, startUrl, expectFilter) {
   var collected = [];
   var url = startUrl || null;       // null => start from current page
   var seen = {};
@@ -166,6 +169,15 @@ async function walkPages(tabId, startUrl) {
     var r;
     try { r = await scrapeTab(tabId, "SCRAPE_PAGE"); }
     catch (e) { break; }
+
+    if (page === 1 && expectFilter && r && r.activeFilter &&
+        r.activeFilter !== expectFilter) {
+      // Amazon did not honor the requested period — don't double-count.
+      setStatus("Skipping period (filter not applied: wanted " + expectFilter +
+        ", got " + r.activeFilter + ")…");
+      return [];
+    }
+
     var found = (r && r.orders) || [];
     collected = ASFA.mergeOrders(collected, found);
     setStatus("Page " + page + " — " + collected.length + " orders so far…");
@@ -205,19 +217,20 @@ async function scanEverything() {
   } catch (e) { filters = []; }
 
   try {
-    if (!filters.length) { return scanAllPages(); }
-    var base = new URL(tab.url);
+    if (!filters.length) {
+      setStatus("No year filter found on this page; scanning current view only…");
+      return scanAllPages();
+    }
+    var before = orders.length;
     for (var i = 0; i < filters.length; i++) {
-      var u = new URL(base.toString());
-      u.searchParams.set("orderFilter", filters[i].value);
-      u.searchParams.set("startIndex", "0");
+      var startUrl = ASFA.applyTimeFilter(tab.url, filters[i].value);
       setStatus("Scanning " + filters[i].label + " (" + (i + 1) + "/" + filters.length + ")…");
-      var found = await walkPages(tab.id, u.toString());
+      var found = await walkPages(tab.id, startUrl, filters[i].value);
       orders = ASFA.mergeOrders(orders, found);
       await save(); render();
     }
-    setStatus("Done. Collected " + orders.length + " order(s) across " + filters.length +
-      " period(s).", "ok");
+    setStatus("Done. Collected " + (orders.length - before) + " new order(s) across " +
+      filters.length + " period(s); " + orders.length + " total.", "ok");
   } catch (e) {
     setStatus("Scan stopped: " + e.message, "error");
   }

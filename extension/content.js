@@ -178,8 +178,31 @@
     return items;
   }
 
+  // Fallback total: the order header's left/right grid contains the total near
+  // the "Order placed"/date column. When the explicit "Total" label isn't found
+  // (Amazon sometimes shows shipment status text instead), look for a currency
+  // amount within the header region as a best-effort recovery.
+  var MONEY_RE = /(?:[$£€]|CDN|US|A|S|R|AED|CA)\s?\$?\s?\d[\d.,]*\d|\d[\d.,]*\d\s?[$£€]/;
+
+  function findHeaderTotal(card) {
+    var header = card.querySelector(
+      ".order-header, .a-box.order-info, [class*='order-header'], .a-fixed-right-grid"
+    ) || card;
+    // Collect short text nodes that look like a money amount.
+    var candidates = header.querySelectorAll("span, div, .a-color-secondary, .value");
+    for (var i = 0; i < candidates.length; i++) {
+      var t = text(candidates[i]);
+      if (t && t.length <= 18 && MONEY_RE.test(t) && /[$£€]/.test(t)) {
+        var cents = ASFA.parseMoneyToCents(t);
+        if (cents != null && cents > 0) return t;
+      }
+    }
+    return null;
+  }
+
   function extractOrderFromCard(card, currency) {
     var totalStr = findLabeledValue(card, LABEL_TOTAL);
+    if (totalStr == null) totalStr = findHeaderTotal(card); // best-effort fallback
     var dateStr = findLabeledValue(card, LABEL_DATE) || findFirstDate(card);
     var order = {
       orderId: extractOrderId(card),
@@ -304,7 +327,23 @@
     return false;
   }
 
-  // Scrape the current (live, rendered) page and return {orders, nextUrl}.
+  // Which time filter is currently applied? Prefer the URL param; fall back to
+  // the selected dropdown option. Lets the popup confirm a year switch took.
+  function activeTimeFilter() {
+    try {
+      var p = new URL(location.href).searchParams;
+      var fromUrl = p.get("timeFilter") || p.get("orderFilter");
+      if (fromUrl) return fromUrl;
+    } catch (e) { /* ignore */ }
+    var sel = document.querySelector(
+      'select[name="timeFilter"], select[name="orderFilter"], select#time-filter'
+    );
+    if (sel && sel.value) return sel.value;
+    var opt = document.querySelector("option[selected]");
+    return opt ? (opt.getAttribute("value") || null) : null;
+  }
+
+  // Scrape the current (live, rendered) page and return {orders, nextUrl, activeFilter}.
   async function scrapeCurrentPage() {
     await waitForRender(8000);
     var res = extractOrdersFromDocument(document, { diagnostics: true });
@@ -318,7 +357,10 @@
       u.searchParams.set("startIndex", String(nextStart));
       nextUrl = u.toString();
     }
-    return { orders: res.orders, nextUrl: nextUrl, start: start };
+    return {
+      orders: res.orders, nextUrl: nextUrl, start: start,
+      activeFilter: activeTimeFilter()
+    };
   }
 
   // ---- Diagnostics capture (browser only) ------------------------------

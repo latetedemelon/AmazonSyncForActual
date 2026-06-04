@@ -112,16 +112,36 @@ test("nextStartIndex falls back to current+pageSize without pagination",
     assert.equal(A.nextStartIndex(doc, 30, 10), 40);
   });
 
-test("findTimeFilters reads year/window options", { skip: !JSDOM2 && "no jsdom" }, () => {
-  const doc = dom(`<select name="orderFilter">
-    <option value="months-3">Last 3 months</option>
-    <option value="year-2026">2026</option>
-    <option value="year-2025">2025</option>
-    <option value="archived">Archived Orders</option>
-    <option value="months-3">dupe</option>
-  </select>`);
-  const fs = A.findTimeFilters(doc);
-  const values = fs.map((f) => f.value);
-  assert.deepEqual(values, ["months-3", "year-2026", "year-2025"]); // dupe + archived dropped
-  assert.equal(fs[1].label, "2026");
-});
+test("findTimeFilters reads window+year+archived options, years newest-first",
+  { skip: !JSDOM2 && "no jsdom" }, () => {
+    const doc = dom(`<select name="timeFilter">
+      <option value="months-3">Last 3 months</option>
+      <option value="year-2025">2025</option>
+      <option value="year-2026">2026</option>
+      <option value="archived">Archived Orders</option>
+      <option value="months-3">dupe</option>
+      <option value="not-a-period">junk</option>
+    </select>`);
+    const values = A.findTimeFilters(doc).map((f) => f.value);
+    // dupe + junk dropped; windows/archived before years; years newest-first.
+    assert.deepEqual(values, ["months-3", "archived", "year-2026", "year-2025"]);
+  });
+
+test("findTimeFilters also reads custom dropdown links",
+  { skip: !JSDOM2 && "no jsdom" }, () => {
+    const doc = dom(`<ul>
+      <li><a href="/your-orders/orders?timeFilter=year-2024&startIndex=0">2024</a></li>
+      <li><a href="/your-orders/orders?timeFilter=year-2023">2023</a></li>
+    </ul>`);
+    const values = A.findTimeFilters(doc).map((f) => f.value);
+    assert.deepEqual(values, ["year-2024", "year-2023"]);
+  });
+
+test("applyTimeFilter sets both params and resets startIndex",
+  { skip: !JSDOM2 && "no jsdom" }, () => {
+    const out = A.applyTimeFilter(
+      "https://www.amazon.ca/your-orders/orders?timeFilter=year-2026&startIndex=30", "year-2024");
+    assert.ok(out.includes("timeFilter=year-2024"));
+    assert.ok(out.includes("orderFilter=year-2024"));
+    assert.ok(out.includes("startIndex=0"));
+  });

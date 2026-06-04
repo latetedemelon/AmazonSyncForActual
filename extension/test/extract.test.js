@@ -119,3 +119,20 @@ test("empty unrendered shells are not counted as coverage failures",
     assert.equal(res.report.coverage.emptyShells, 2); // tracked separately
     assert.equal(res.report.fieldFailures.length, 0); // not counted as failures
   });
+
+test("recovers order total from header when no explicit Total label",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    const doc = new JSDOM(`<div class="your-orders-content">
+      <div class="order-card js-order-card">
+        <div class="order-header"><div class="a-fixed-right-grid">
+          <span class="a-color-secondary">Order placed</span>
+          <span class="value">January 5, 2025</span>
+          <span class="value">CDN$ 34.23</span>
+          <span class="value">702-1111111-2222222</span>
+        </div></div>
+        <a class="a-link-normal" href="/dp/B08BMV5VDL">Sunscreen</a>
+      </div></div>`).window.document;
+    const o = extractOrdersFromDocument(doc, { host: "amazon.ca" })[0];
+    assert.equal(o.orderTotalCents, 3423);
+    assert.equal(o.currency, "CAD");
+  });

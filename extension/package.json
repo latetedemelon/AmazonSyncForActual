@@ -1,7 +1,7 @@
 {
   "name": "amazon-sync-for-actual-extension",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Browser extension that gathers Amazon order data as a CSV for Amazon Sync for Actual.",
   "license": "MIT",
   "scripts": {
