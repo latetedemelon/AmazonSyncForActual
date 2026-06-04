@@ -27,7 +27,11 @@
   // Physical orders are 3-7-7 digits; digital orders (Kindle, Alexa, apps) use a
   // letter-prefixed group like "D01-1234567-1234567". Accept up to 3 leading
   // letters so digital orders aren't dropped.
-  var ORDER_ID_RE = /\b[A-Z]{0,3}\d{1,3}-\d{7}-\d{7}\b/i;
+  // Physical ids are 3-7-7 digits; digital (Kindle/Alexa/app) ids are letter-
+  // prefixed like "D01-1234567-1234567". No \b anchors, so the id is still found
+  // if it's glued to an adjacent value (e.g. "$24.99702-..."); a trailing
+  // (?!\d) keeps the 7-digit groups exact.
+  var ORDER_ID_RE = /[A-Z]{0,3}\d{1,3}-\d{7}-\d{7}(?!\d)/i;
   var ASIN_RE = /\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i;
   var PRODUCT_HREF_RE = /\/(?:dp|gp\/product|product)\//;
 
@@ -45,8 +49,27 @@
     ".order"
   ];
 
+  // A cancelled order shows a "you have not been charged" notice instead of a
+  // total. It was never charged, so there is no Actual transaction to match —
+  // these are skipped. The "not charged" phrasing is the most reliable signal;
+  // a short "Cancelled" status heading is a backup for other locales.
+  var NOT_CHARGED_RE = /not been charged|n['’]avez\s+pas\s+été\s+(?:débité|facturé)|no se le ha cobrado|wurde nicht belastet|non (?:ti è stato|è stato) addebitato/i;
+  var CANCELLED_STATUS_RE = /^\s*(cancell?ed|annul[ée]|cancelad|annullat|storniert)/i;
+
   function text(el) {
     return el && el.textContent ? el.textContent.replace(/\s+/g, " ").trim() : "";
+  }
+
+  function isCancelledCard(card) {
+    if (NOT_CHARGED_RE.test(text(card))) return true;
+    var statusEls = card.querySelectorAll(
+      '[class*="shipment-status"], .delivery-box, h3, h4, .a-size-base-plus, .a-text-bold'
+    );
+    for (var i = 0; i < statusEls.length; i++) {
+      var t = text(statusEls[i]);
+      if (t && t.length <= 24 && CANCELLED_STATUS_RE.test(t)) return true;
+    }
+    return false;
   }
 
   // Returns { cards, selector } so diagnostics can record which selector worked
@@ -123,6 +146,15 @@
   }
 
   function extractOrderId(card) {
+    // Prefer the dedicated order-id element (isolated text => clean match, even
+    // when the card-level text glues values together).
+    var el = card.querySelector(
+      '.yohtmlc-order-id, [class*="order-id"], [class*="order-number"]'
+    );
+    if (el) {
+      var byEl = text(el).match(ORDER_ID_RE);
+      if (byEl) return byEl[0];
+    }
     var byText = text(card).match(ORDER_ID_RE);
     if (byText) return byText[0];
     var links = card.querySelectorAll('a[href]');
@@ -248,6 +280,7 @@
     var fieldFailures = [];
 
     var emptyShells = 0;
+    var cancelled = 0;
     found.cards.forEach(function (card) {
       var order = extractOrderFromCard(card, currency);
       // An "empty shell" is an order-card whose contents haven't rendered yet
@@ -257,6 +290,11 @@
       var isShell = !order.orderId && !order.orderDate &&
         order.orderTotalCents == null && !order.items.length;
       if (isShell) { emptyShells++; return; }
+
+      // Cancelled orders were never charged (no total, no transaction to match).
+      // Skip them, and don't count them against coverage — a missing total on a
+      // cancelled card is expected, not an extraction failure.
+      if (isCancelledCard(card)) { cancelled++; return; }
 
       coverage.cards++;
       if (order.orderId) coverage.orderId++;
@@ -271,6 +309,7 @@
       if (order.items.length || order.orderTotalCents != null) orders.push(order);
     });
     coverage.emptyShells = emptyShells;
+    coverage.cancelled = cancelled;
 
     var merged = ASFA.mergeOrders(orders);
     if (!opts.diagnostics) return merged;
@@ -458,6 +497,7 @@
       extractItems: extractItems,
       extractOrderId: extractOrderId,
       extractAsin: extractAsin,
+      isCancelledCard: isCancelledCard,
       scrapeCurrentPage: scrapeCurrentPage
     };
   }

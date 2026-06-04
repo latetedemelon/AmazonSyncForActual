@@ -53,6 +53,8 @@ _FIELD_ALIASES: Dict[str, str] = {
     "currency": "currency",
     "asin": "asin",
     "asin/isbn": "asin",
+    "order status": "order_status",
+    "shipment status": "shipment_status",
 }
 
 # Filenames we recognise inside a directory / zip, in priority order.
@@ -110,6 +112,12 @@ def rows_to_orders(rows: List[Dict[str, str]]) -> List[AmazonOrder]:
         name = canonical.get("name", "")
         total = _line_total_cents(canonical)
         order_total = to_cents(canonical.get("order_total"))
+        # Skip cancelled lines: they were never charged, so there's no
+        # transaction to reconcile against (the GDPR export marks these in the
+        # Order Status / Shipment Status columns).
+        status = f"{canonical.get('order_status', '')} {canonical.get('shipment_status', '')}".lower()
+        if "cancel" in status:
+            continue
         # Skip rows with no item and no money signal (blank lines, repeated
         # headers in concatenated files, etc.).
         if not name and total == 0 and order_total is None:

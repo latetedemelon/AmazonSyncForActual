@@ -136,3 +136,61 @@ test("recovers order total from header when no explicit Total label",
     assert.equal(o.orderTotalCents, 3423);
     assert.equal(o.currency, "CAD");
   });
+
+test("cancelled orders are skipped (never charged)",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    const doc = new JSDOM(`<div class="your-orders-content">
+      <div class="order-card js-order-card">
+        <div class="order-header"><div class="a-fixed-right-grid">
+          <span class="a-color-secondary">Order placed</span><span class="value">December 6, 2025</span>
+          <span class="value">702-0045705-1427416</span>
+        </div></div>
+        <div class="a-size-base-plus a-text-bold">Cancelled</div>
+        <div>Your order was cancelled. You have not been charged for this order.</div>
+        <a class="a-link-normal" href="/dp/B00EXTCORD">Amazon Basics 15-Foot Extension Cord</a>
+      </div>
+      <div class="order-card js-order-card">
+        <div class="order-header"><div class="a-fixed-right-grid">
+          <span class="a-color-secondary">Order placed</span><span class="value">December 7, 2025</span>
+          <span class="a-color-secondary">Total</span><span class="value">$19.99</span>
+          <span class="value">702-1111111-2222222</span>
+        </div></div>
+        <a class="a-link-normal" href="/dp/B00REALITEM">A real shipped item</a>
+      </div>
+    </div>`).window.document;
+    const res = extractOrdersFromDocument(doc, { host: "amazon.ca", diagnostics: true });
+    // Only the non-cancelled order is kept.
+    assert.equal(res.orders.length, 1);
+    assert.equal(res.orders[0].orderId, "702-1111111-2222222");
+    // The cancelled card is counted separately, not as a coverage failure.
+    assert.equal(res.report.coverage.cancelled, 1);
+    assert.equal(res.report.coverage.cards, 1);
+    assert.equal(res.report.fieldFailures.length, 0);
+  });
+
+test("isCancelledCard detects the not-charged notice and status word",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    const C = require("../content.js");
+    function card(html) {
+      return new JSDOM("<div class='order-card'>" + html + "</div>").window.document
+        .querySelector(".order-card");
+    }
+    assert.equal(C.isCancelledCard(card("<div>You have not been charged for this order.</div>")), true);
+    assert.equal(C.isCancelledCard(card("<h3>Cancelled</h3>")), true);
+    assert.equal(C.isCancelledCard(card("<div>Delivered Dec 6</div><span>$19.99</span>")), false);
+  });
+
+test("extractOrderId tolerates an id glued to an adjacent value",
+  { skip: !JSDOM && "jsdom not installed" }, () => {
+    function card(html) {
+      return new JSDOM("<div class='order-card'>" + html + "</div>").window.document
+        .querySelector(".order-card");
+    }
+    // No whitespace between the total and the order id.
+    assert.equal(extractOrderId(card("<span>$24.99</span><span>702-1234567-1234567</span>")),
+      "702-1234567-1234567");
+    // Dedicated element is read even if card text is messy.
+    assert.equal(
+      extractOrderId(card('<span>$5</span><span class="yohtmlc-order-id">Order # 113-9999999-8888888</span>')),
+      "113-9999999-8888888");
+  });

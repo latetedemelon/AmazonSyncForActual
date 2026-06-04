@@ -124,3 +124,17 @@ def test_missing_path_raises():
     except ValueError:
         return
     raise AssertionError("expected ValueError for missing path")
+
+
+def test_cancelled_rows_skipped_via_status():
+    rows = [
+        {"Order ID": "111-1", "Order Date": "2025-12-06", "Product Name": "Extension Cord",
+         "Order Status": "Cancelled", "Order Total": "0.00", "Currency": "CAD"},
+        {"Order ID": "111-2", "Order Date": "2025-12-07", "Product Name": "Real Item",
+         "Order Status": "Closed", "Total Owed": "19.99", "Currency": "CAD"},
+        {"Order ID": "111-3", "Order Date": "2025-12-08", "Product Name": "Cancelled shipment",
+         "Shipment Status": "Cancelled", "Total Owed": "5.00", "Currency": "CAD"},
+    ]
+    orders = rows_to_orders(rows)
+    assert [o.order_id for o in orders] == ["111-2"]
+    assert orders[0].total_cents == 1999
