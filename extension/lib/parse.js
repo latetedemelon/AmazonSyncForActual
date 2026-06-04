@@ -163,6 +163,68 @@
     return rows.join("\n") + "\n";
   }
 
+  // Pagination: Amazon order list pages step `startIndex` by a page size (10).
+  // Rather than guess, we read the actual "Next" link's startIndex when present
+  // and otherwise fall back to current + pageSize. Returns null when there is no
+  // next page (so the walker can stop cleanly).
+  function nextStartIndex(doc, currentStart, pageSize) {
+    pageSize = pageSize || 10;
+    currentStart = currentStart || 0;
+
+    function startIndexFromHref(href) {
+      if (!href) return null;
+      var m = String(href).match(/[?&]startIndex=(\d+)/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+
+    if (doc && doc.querySelectorAll) {
+      // Prefer an explicit, non-disabled "Next" pagination control.
+      var sels = [
+        ".a-pagination li.a-last:not(.a-disabled) a",
+        "ul.a-pagination .a-last:not(.a-disabled) a",
+        "a.a-last",
+        '[class*="pagination"] a[href*="startIndex"]'
+      ];
+      for (var s = 0; s < sels.length; s++) {
+        var nodes = doc.querySelectorAll(sels[s]);
+        for (var i = 0; i < nodes.length; i++) {
+          var si = startIndexFromHref(nodes[i].getAttribute("href"));
+          if (si !== null && si > currentStart) return si;
+        }
+      }
+      // If a disabled "last" element exists, we are on the final page.
+      if (doc.querySelector(".a-pagination li.a-last.a-disabled, .a-last.a-disabled")) {
+        return null;
+      }
+    }
+    // No pagination info: caller decides whether to try current + pageSize.
+    return currentStart + pageSize;
+  }
+
+  // Discover the available time filters (years / "last 3 months") from the
+  // orders page's time-period dropdown, so a full scan can walk each one.
+  // Returns a de-duplicated list of {label, value} (value is the orderFilter).
+  function findTimeFilters(doc) {
+    var out = [];
+    var seen = {};
+    if (!doc || !doc.querySelectorAll) return out;
+    var opts = doc.querySelectorAll(
+      'select#time-filter option, select[name="orderFilter"] option, ' +
+      'form[action*="order-history"] select option, [name="timeFilter"] option'
+    );
+    for (var i = 0; i < opts.length; i++) {
+      var value = opts[i].getAttribute("value") || "";
+      var label = (opts[i].textContent || "").replace(/\s+/g, " ").trim();
+      if (!value || seen[value]) continue;
+      // Keep year buckets and the rolling windows; skip the "archived" pseudo.
+      if (/^(year-\d{4}|months-\d+|last30|year-\d+)$/.test(value) || /^\d{4}$/.test(value)) {
+        seen[value] = true;
+        out.push({ label: label, value: value });
+      }
+    }
+    return out;
+  }
+
   // Combine order lists, de-duplicating by order id (and items by ASIN/name) so
   // repeated scans / multi-page scans accumulate cleanly.
   function mergeOrders() {
@@ -224,6 +286,8 @@
     csvEscape: csvEscape,
     ordersToCsv: ordersToCsv,
     mergeOrders: mergeOrders,
+    nextStartIndex: nextStartIndex,
+    findTimeFilters: findTimeFilters,
     buildBridgeOptions: buildBridgeOptions
   };
 

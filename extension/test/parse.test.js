@@ -83,3 +83,45 @@ test("mergeOrders de-duplicates by order id and items", () => {
   assert.equal(merged[0].items.length, 2);
   assert.equal(merged[0].orderTotalCents, 100);
 });
+
+// ---- pagination / time-filter helpers (need a DOM) ----
+let JSDOM2 = null;
+try { ({ JSDOM: JSDOM2 } = require("jsdom")); } catch (e) { JSDOM2 = null; }
+function dom(html) { return new JSDOM2(html).window.document; }
+
+test("nextStartIndex follows a real Next link", { skip: !JSDOM2 && "no jsdom" }, () => {
+  const doc = dom(`<ul class="a-pagination">
+    <li class="a-normal"><a href="?startIndex=0">1</a></li>
+    <li class="a-selected"><a>2</a></li>
+    <li class="a-last"><a href="/your-orders?startIndex=20&x=1">Next</a></li>
+  </ul>`);
+  assert.equal(A.nextStartIndex(doc, 10, 10), 20);
+});
+
+test("nextStartIndex returns null on the last page", { skip: !JSDOM2 && "no jsdom" }, () => {
+  const doc = dom(`<ul class="a-pagination">
+    <li class="a-normal"><a href="?startIndex=10">prev</a></li>
+    <li class="a-last a-disabled"><span>Next</span></li>
+  </ul>`);
+  assert.equal(A.nextStartIndex(doc, 20, 10), null);
+});
+
+test("nextStartIndex falls back to current+pageSize without pagination",
+  { skip: !JSDOM2 && "no jsdom" }, () => {
+    const doc = dom(`<div>no pagination here</div>`);
+    assert.equal(A.nextStartIndex(doc, 30, 10), 40);
+  });
+
+test("findTimeFilters reads year/window options", { skip: !JSDOM2 && "no jsdom" }, () => {
+  const doc = dom(`<select name="orderFilter">
+    <option value="months-3">Last 3 months</option>
+    <option value="year-2026">2026</option>
+    <option value="year-2025">2025</option>
+    <option value="archived">Archived Orders</option>
+    <option value="months-3">dupe</option>
+  </select>`);
+  const fs = A.findTimeFilters(doc);
+  const values = fs.map((f) => f.value);
+  assert.deepEqual(values, ["months-3", "year-2026", "year-2025"]); // dupe + archived dropped
+  assert.equal(fs[1].label, "2026");
+});

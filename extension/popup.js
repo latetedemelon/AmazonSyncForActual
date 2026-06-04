@@ -102,22 +102,39 @@ async function activeTab() {
   return tabs[0];
 }
 
-async function scan(type, maxPages) {
+// Live progress pushed from the content script during a multi-page walk.
+chrome.runtime.onMessage.addListener(function (msg) {
+  if (!msg || msg.type !== "SCAN_PROGRESS") return;
+  var d = msg.detail || {};
+  if (d.phase === "filter") {
+    setStatus("Scanning " + d.label + " (" + d.index + "/" + d.of + ")…");
+  } else if (d.label) {
+    setStatus("Scanning " + d.label + " — page " + (d.page || "?") + ", " + (d.total || 0) + " orders…");
+  } else {
+    setStatus("Scanning page " + (d.page || "?") + " — " + (d.total || 0) + " orders so far…");
+  }
+});
+
+async function scan(type, opts) {
+  opts = opts || {};
   var tab = await activeTab();
   if (!tab || !/(^|\.)amazon\./.test(new URL(tab.url || "http://x").hostname)) {
-    setStatus("Open your Amazon Orders page first.");
+    setStatus("Open your Amazon Orders page first.", "error");
     return;
   }
-  setStatus("Scanning…");
+  setStatus(type === "SCAN_PAGE" ? "Scanning…" : "Scanning (auto-walking pages)…");
   try {
-    var resp = await chrome.tabs.sendMessage(tab.id, { type: type, maxPages: maxPages });
+    var resp = await chrome.tabs.sendMessage(tab.id, Object.assign({ type: type }, opts));
     var found = (resp && resp.orders) || [];
     orders = ASFA.mergeOrders(orders, found);
     await save();
     render();
-    setStatus("Found " + found.length + " order(s) this scan; " + orders.length + " total.");
+    var note = resp && resp.error ? " (stopped: " + resp.error + ")" : "";
+    setStatus("Found " + found.length + " order(s) this scan; " + orders.length + " total." + note,
+      "ok");
   } catch (e) {
-    setStatus("Couldn't scan. Make sure you're on the Orders page and reload it, then retry.");
+    setStatus("Couldn't scan. Make sure you're on the Orders page and reload it, then retry.",
+      "error");
   }
 }
 
@@ -136,7 +153,8 @@ function download(content, filename, mime) {
 function today() { return new Date().toISOString().slice(0, 10); }
 
 $("scan").addEventListener("click", function () { scan("SCAN_PAGE"); });
-$("scanmore").addEventListener("click", function () { scan("SCAN_PAGES", 6); });
+$("scanall").addEventListener("click", function () { scan("SCAN_ALL", {}); });
+$("scaneverything").addEventListener("click", function () { scan("SCAN_EVERYTHING", {}); });
 $("csv").addEventListener("click", function () {
   if (!orders.length) return setStatus("Nothing collected yet.");
   download(ASFA.ordersToCsv(orders), "amazon-orders-" + today() + ".csv", "text/csv");

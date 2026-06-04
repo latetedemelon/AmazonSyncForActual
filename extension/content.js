@@ -260,25 +260,129 @@
   }
 
   // ---- Multi-page scan (browser only) ----------------------------------
-  async function scanPages(maxPages) {
-    var all = extractOrdersFromDocument(document);
+  var PAGE_SIZE = 10;
+  var FETCH_DELAY_MS = 800;      // be polite; avoid hammering Amazon
+  var MAX_PAGES_HARD_CAP = 200;  // safety: never loop forever
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // The most recently parsed document during a walk (live document for page 1),
+  // used to find the next page's startIndex.
+  var lastDoc = null;
+
+  async function fetchDoc(url) {
+    var resp = await fetch(url, { credentials: "include", redirect: "follow" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    var html = await resp.text();
+    return new DOMParser().parseFromString(html, "text/html");
+  }
+
+  // Walk every page of the *current* order-list view by following the real
+  // "Next" link (falling back to startIndex stepping), with safety caps, polite
+  // delays, empty-page stop, and a guard against revisiting the same offset.
+  // onProgress({page, orders, total}) is called after each page.
+  async function scanAllPages(opts) {
+    opts = opts || {};
+    var maxPages = Math.min(opts.maxPages || MAX_PAGES_HARD_CAP, MAX_PAGES_HARD_CAP);
+    var delay = opts.delayMs != null ? opts.delayMs : FETCH_DELAY_MS;
+    var onProgress = opts.onProgress || function () {};
+
+    // Page 1 = the document we're already on (no extra request).
+    var res = extractOrdersFromDocument(document, { diagnostics: true });
+    if (res.report) recordReport(res.report);
+    var all = res.orders;
+    onProgress({ page: 1, orders: res.orders.length, total: all.length });
+
     var base = new URL(location.href);
     var start = parseInt(base.searchParams.get("startIndex") || "0", 10);
-    for (var p = 1; p < (maxPages || 1); p++) {
-      start += 10;
+    var seenStarts = {}; seenStarts[start] = true;
+    var emptyStreak = 0;
+    lastDoc = document;  // page 1 came from the live document
+
+    for (var page = 2; page <= maxPages; page++) {
+      // Find the next page's offset from the last document we parsed.
+      var nextStart = ASFA.nextStartIndex(lastDoc, start, PAGE_SIZE);
+      if (nextStart === null || seenStarts[nextStart]) break;
+      seenStarts[nextStart] = true;
+      start = nextStart;
+
       base.searchParams.set("startIndex", String(start));
+      if (delay) await sleep(delay);
+
       var doc;
       try {
-        var resp = await fetch(base.toString(), { credentials: "include" });
-        if (!resp.ok) break;
-        var html = await resp.text();
-        doc = new DOMParser().parseFromString(html, "text/html");
+        doc = await fetchDoc(base.toString());
       } catch (e) {
-        break;
+        break; // network/HTTP error: stop gracefully with what we have
       }
-      var orders = extractOrdersFromDocument(doc);
-      if (!orders.length) break;
-      all = ASFA.mergeOrders(all, orders);
+      lastDoc = doc;
+
+      var pageRes = extractOrdersFromDocument(doc, {
+        diagnostics: true, host: base.hostname, path: base.pathname
+      });
+      if (pageRes.report) recordReport(pageRes.report);
+
+      if (!pageRes.orders.length) {
+        if (++emptyStreak >= 2) break; // two empty pages in a row => done
+      } else {
+        emptyStreak = 0;
+      }
+      all = ASFA.mergeOrders(all, pageRes.orders);
+      onProgress({ page: page, orders: pageRes.orders.length, total: all.length });
+    }
+    return all;
+  }
+
+  // Walk every available time filter (each year + rolling windows), paging
+  // through each. This collects a whole account's history in one go.
+  async function scanEverything(opts) {
+    opts = opts || {};
+    var onProgress = opts.onProgress || function () {};
+    var filters = ASFA.findTimeFilters(document);
+    var all = [];
+
+    if (!filters.length) {
+      // No filter dropdown found; just page the current view.
+      return scanAllPages(opts);
+    }
+
+    for (var f = 0; f < filters.length; f++) {
+      var url = new URL(location.href);
+      url.searchParams.set("orderFilter", filters[f].value);
+      url.searchParams.set("startIndex", "0");
+      onProgress({ phase: "filter", label: filters[f].label, index: f + 1, of: filters.length });
+
+      var doc;
+      try {
+        if (opts.delayMs !== 0) await sleep(opts.delayMs != null ? opts.delayMs : FETCH_DELAY_MS);
+        doc = await fetchDoc(url.toString());
+      } catch (e) {
+        continue;
+      }
+      lastDoc = doc;
+
+      // Page through this filter using fetched docs (we are not navigating).
+      var start = 0;
+      var seen = { 0: true };
+      var emptyStreak = 0;
+      for (var page = 1; page <= MAX_PAGES_HARD_CAP; page++) {
+        var pageRes = extractOrdersFromDocument(doc, {
+          diagnostics: true, host: url.hostname, path: url.pathname
+        });
+        if (pageRes.report) recordReport(pageRes.report);
+        if (!pageRes.orders.length) { if (++emptyStreak >= 2) break; }
+        else { emptyStreak = 0; all = ASFA.mergeOrders(all, pageRes.orders); }
+        onProgress({ phase: "page", label: filters[f].label, page: page, total: all.length });
+
+        var nextStart = ASFA.nextStartIndex(doc, start, PAGE_SIZE);
+        if (nextStart === null || seen[nextStart]) break;
+        seen[nextStart] = true;
+        start = nextStart;
+        url.searchParams.set("startIndex", String(start));
+        if (opts.delayMs !== 0) await sleep(opts.delayMs != null ? opts.delayMs : FETCH_DELAY_MS);
+        try { doc = await fetchDoc(url.toString()); lastDoc = doc; }
+        catch (e) { break; }
+      }
     }
     return all;
   }
@@ -323,10 +427,26 @@
         sendResponse({ orders: res.orders });
         return true;
       }
-      if (msg.type === "SCAN_PAGES") {
-        scanPages(msg.maxPages || 5).then(function (orders) {
-          sendResponse({ orders: orders });
-        });
+      if (msg.type === "SCAN_PAGES" || msg.type === "SCAN_ALL") {
+        // Auto-walk every page of the current view (following real Next links).
+        function progress(p) {
+          try { chrome.runtime.sendMessage({ type: "SCAN_PROGRESS", detail: p }); }
+          catch (e) { /* popup may be closed; ignore */ }
+        }
+        scanAllPages({ maxPages: msg.maxPages, delayMs: msg.delayMs, onProgress: progress })
+          .then(function (orders) { sendResponse({ orders: orders }); })
+          .catch(function (e) { sendResponse({ orders: [], error: String(e) }); });
+        return true; // async response
+      }
+      if (msg.type === "SCAN_EVERYTHING") {
+        // Auto-walk every time filter (each year) and every page within.
+        function progressE(p) {
+          try { chrome.runtime.sendMessage({ type: "SCAN_PROGRESS", detail: p }); }
+          catch (e) { /* ignore */ }
+        }
+        scanEverything({ delayMs: msg.delayMs, onProgress: progressE })
+          .then(function (orders) { sendResponse({ orders: orders }); })
+          .catch(function (e) { sendResponse({ orders: [], error: String(e) }); });
         return true; // async response
       }
       if (msg.type === "CAPTURE_DIAGNOSTICS") {
@@ -358,7 +478,9 @@
       findLabeledValue: findLabeledValue,
       extractItems: extractItems,
       extractOrderId: extractOrderId,
-      extractAsin: extractAsin
+      extractAsin: extractAsin,
+      scanAllPages: scanAllPages,
+      scanEverything: scanEverything
     };
   }
 })();

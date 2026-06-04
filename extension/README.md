@@ -53,11 +53,15 @@ ZIP — that's a separate listing step.)
 
 ## Use
 
-1. Open Amazon and go to **Returns & Orders** (your order history). Pick the time
-   range you want (e.g. *past 3 months* / a given year).
-2. Click the extension icon → **Scan this page**. The counter shows how many
-   orders were collected. Switch the year/filter and scan again to accumulate;
-   or use **Scan more pages** to walk pagination automatically.
+1. Open Amazon and go to **Returns & Orders** (your order history).
+2. Click the extension icon, then choose how much to collect:
+   - **Scan this page** — just the orders currently shown.
+   - **Scan all pages** — auto-walks every page of the current view by following
+     the real *Next* link (no manual clicking). Live progress shows in the popup.
+   - **Scan entire history (all years)** — walks every time filter (each year and
+     the rolling windows) and every page within, collecting the whole account in
+     one go.
+   Scans accumulate and de-duplicate, so you can combine them safely.
 3. Click **Download CSV**.
 4. Feed it to the tool (preview first):
 
