@@ -45,6 +45,13 @@ jobs:
       - name: Run extension tests
         working-directory: extension
         run: node --test
+      - name: Package the extension
+        working-directory: extension
+        run: python3 build.py --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-zip
+          path: extension/dist/*.zip
 
   build:
     runs-on: ubuntu-latest

@@ -15,21 +15,41 @@ a day later). The extension reads the same order data live from the *Your Orders
 page you can already see, and writes a CSV with the **exact headers the importer
 reads** — so it's a drop-in, faster alternative.
 
-## Install (developer / unpacked)
+## Package it
 
-The extension is unpacked (no build step).
+Build an installable ZIP (stdlib only, no Node/bundler). It contains only the
+runtime files — never tests, `node_modules`, or build scripts:
+
+```bash
+cd extension
+python3 build.py            # -> extension/dist/amazon-sync-for-actual-extension-<version>.zip
+```
+
+The script validates the manifest, prints the file list, size and a SHA-256, and
+fails if any referenced script is missing from its whitelist. The same build runs
+in CI and uploads the zip as an artifact.
+
+## Install
+
+You can install either the **packaged ZIP** or the **unpacked folder** — both
+contain the same files.
 
 **Chrome / Edge / Brave (Chromium):**
-1. Go to `chrome://extensions`.
-2. Enable **Developer mode**.
-3. **Load unpacked** → select this `extension/` folder.
+1. Go to `chrome://extensions` and enable **Developer mode**.
+2. Either **Load unpacked** → select this `extension/` folder, *or* unzip the
+   built package and **Load unpacked** → select the unzipped folder.
+   *(Chromium only installs a raw `.zip` directly when it is signed/from the Web
+   Store, so for local installs you load the folder — drag-and-drop of an
+   unpacked dir also works.)*
 
 **Firefox:**
 1. Go to `about:debugging#/runtime/this-firefox`.
-2. **Load Temporary Add-on…** → select `extension/manifest.json`.
+2. **Load Temporary Add-on…** → select `extension/manifest.json` (or the
+   `manifest.json` inside the unzipped package).
 
 (Chromium MV3 is the primary target; the manifest is kept simple so it also
-loads in current Firefox.)
+loads in current Firefox. Publishing to the Chrome Web Store / AMO uses the same
+ZIP — that's a separate listing step.)
 
 ## Use
 
