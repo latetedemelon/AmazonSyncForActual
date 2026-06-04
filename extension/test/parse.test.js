@@ -37,6 +37,16 @@ test("normalizeDate handles US and UK styles", () => {
   assert.equal(A.normalizeDate("not a date"), "not a date");
 });
 
+test("normalizeDate rejects implausible (epoch/garbage) dates", () => {
+  // The "Alexa+" subscription card produced these; never emit a 1970 date.
+  assert.equal(A.normalizeDate("January 1, 1970"), "");
+  assert.equal(A.normalizeDate("Thu Jan 01 1970"), "");
+  assert.equal(A.normalizeDate("1970-01-01"), "");
+  assert.equal(A.normalizeDate("1999-12-31"), "");        // before Amazon-era floor
+  assert.equal(A.normalizeDate("2099-01-01"), "");        // far future
+  assert.equal(A.normalizeDate("January 10, 2024"), "2024-01-10"); // still works
+});
+
 test("centsToAmountString and parseQuantity", () => {
   assert.equal(A.centsToAmountString(4376), "43.76");
   assert.equal(A.centsToAmountString(5), "0.05");

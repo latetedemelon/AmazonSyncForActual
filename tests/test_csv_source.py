@@ -30,10 +30,12 @@ def test_retail_export_parsing():
     assert batteries.quantity == 2
 
 
-def test_zero_dollar_digital_order_kept_but_zero():
+def test_zero_dollar_order_with_real_id_kept():
+    # A $0 order that has a real order id is preserved (its total may simply have
+    # failed to extract; it shouldn't be silently lost). It can't match a charge,
+    # but it stays in the data.
     orders = _orders_by_id(CsvSource(RETAIL).fetch_orders())
-    digital = orders["114-3333333-3333333"]
-    assert digital.total_cents == 0
+    assert orders["114-3333333-3333333"].total_cents == 0
 
 
 def test_legacy_items_report():
@@ -69,15 +71,22 @@ def test_zero_dollar_no_id_junk_order_dropped():
     assert rows_to_orders(rows) == []
 
 
-def test_zero_dollar_order_with_real_id_is_kept():
-    # ...but a $0 order that *has* a real order id is preserved (it may pair with
-    # a separately-charged shipment, and is not synthetic junk).
-    rows = [{"Order ID": "114-3333333-3333333", "Order Date": "2024-03-01",
-             "Product Name": "Kindle eBook A Free Sample", "Quantity": "1",
-             "Order Total": "0.00", "Currency": "USD"}]
+def test_zero_dollar_no_id_synthetic_order_dropped():
+    # A $0 row with no order id at all is synthetic junk and is dropped...
+    rows = [{"Order ID": "", "Order Date": "", "Product Name": "promo",
+             "Quantity": "1", "Order Total": "0.00", "Currency": "CAD"}]
+    assert rows_to_orders(rows) == []
+
+
+def test_zero_dollar_with_digital_id_kept():
+    # ...but a $0 order with a real digital id (the "Alexa+" case) is kept; the
+    # date guard means it no longer carries a bogus 1970 date.
+    rows = [{"Order ID": "D01-6538930-6877005", "Order Date": "",
+             "Product Name": "Alexa+", "Quantity": "1",
+             "Order Total": "0.00", "Currency": "CAD"}]
     orders = rows_to_orders(rows)
-    assert len(orders) == 1
-    assert orders[0].order_id == "114-3333333-3333333"
+    assert len(orders) == 1 and orders[0].order_id == "D01-6538930-6877005"
+    assert orders[0].order_date is None
 
 
 def test_unit_price_fallback_when_total_missing():

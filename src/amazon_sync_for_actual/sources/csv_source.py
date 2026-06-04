@@ -145,9 +145,10 @@ def rows_to_orders(rows: List[Dict[str, str]]) -> List[AmazonOrder]:
                 )
             )
 
-    # Drop clear junk: a synthetic-id order (the source gave no order id) that
-    # also has no money. These are typically $0 digital promos (e.g. "Alexa+")
-    # that can never reconcile against a transaction anyway.
+    # Drop only clear junk: a synthetic-id order (the source gave no order id)
+    # that also has no money. These are $0 rows with nothing to reconcile. Real
+    # $0-total orders (e.g. a purchase whose total didn't extract, or a digital
+    # item) are kept — they can't match a charge but shouldn't be silently lost.
     return [
         orders[oid]
         for oid in order_sequence

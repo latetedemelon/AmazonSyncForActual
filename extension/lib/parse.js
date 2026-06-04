@@ -109,15 +109,25 @@
     return n > 0 ? n : 1;
   }
 
+  // A calendar year is "plausible" for an Amazon order: not the Unix epoch / a
+  // mis-parse, and not the far future. Cards without a real order date (e.g. the
+  // "Alexa+" subscription) otherwise collapsed to 1970-01-01.
+  function plausibleYear(y) {
+    var now = new Date().getFullYear();
+    return y >= 2000 && y <= now + 1;
+  }
+
   // Normalise a date string to YYYY-MM-DD when possible, else return it trimmed.
+  // Returns "" for implausible parses (epoch/garbage) rather than a bogus date.
   function normalizeDate(value) {
     if (!value) return "";
     var s = String(value).trim();
     var iso = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+    if (iso) return plausibleYear(parseInt(iso[1], 10)) ? (iso[1] + "-" + iso[2] + "-" + iso[3]) : "";
     var t = Date.parse(s);
     if (!isNaN(t)) {
       var d = new Date(t);
+      if (!plausibleYear(d.getFullYear())) return "";
       var mo = String(d.getMonth() + 1).padStart(2, "0");
       var da = String(d.getDate()).padStart(2, "0");
       return d.getFullYear() + "-" + mo + "-" + da;
