@@ -179,3 +179,20 @@ def test_run_server_env_must_be_truthy(monkeypatch):
     monkeypatch.setenv("ASFA_BRIDGE_ALLOW_REMOTE", "0")
     with pytest.raises(ValueError):
         bridge.run_server(Config(), host="0.0.0.0")
+
+
+def test_run_server_port_in_use_gives_actionable_error():
+    import socket
+    from amazon_sync_for_actual import bridge as br
+    # Occupy a loopback port, then ask the bridge to bind the same one.
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    s.listen(1)
+    taken = s.getsockname()[1]
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            br.run_server(Config(), host="127.0.0.1", port=taken)
+        msg = str(exc.value)
+        assert "--port" in msg and str(taken) in msg
+    finally:
+        s.close()

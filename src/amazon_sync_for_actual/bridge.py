@@ -226,7 +226,18 @@ def run_server(
         )
 
     handler = _make_handler(config, token, origin_prefixes)
-    httpd = ThreadingHTTPServer((host, port), handler)
+    try:
+        httpd = ThreadingHTTPServer((host, port), handler)
+    except OSError as exc:
+        # Most commonly: the port is already in use. Give an actionable hint
+        # instead of a bare errno, since port conflicts are expected locally.
+        raise RuntimeError(
+            f"Could not start the bridge on {host}:{port} ({exc}). "
+            f"If that port is in use, pick another with `--port <N>` "
+            f"(or ASFA_BRIDGE_PORT / [bridge] port in your config), then set the "
+            f"same port as the Bridge URL in the extension's settings."
+        ) from exc
+
     log.info("Amazon Sync bridge listening on http://%s:%d (token=%s)",
              host, port, "set" if token else "none")
     print(f"Bridge running at http://{host}:{port}  (Ctrl-C to stop)")

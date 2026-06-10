@@ -111,18 +111,30 @@ protocol), a tiny **local** companion does the write using the same matching
 logic as the CLI:
 
 ```bash
-amazon-sync-for-actual -c config.ini --serve      # runs on http://127.0.0.1:5007
+amazon-sync-for-actual -c config.ini --serve            # default http://127.0.0.1:5007
+amazon-sync-for-actual -c config.ini --serve --port 7777  # pick any free port
 ```
 
-Then in the extension's **Settings**, set the bridge URL (and token, if you used
-`--bridge-token`), pick a note mode, and click **Preview in Actual** or **Send to
-Actual**. The bridge:
+Then in the extension's **Settings**, set the **Bridge URL** to match
+(`http://127.0.0.1:<port>`), add a token if you used `--bridge-token`, pick a note
+mode, and click **Preview in Actual** or **Send to Actual**. The bridge:
 
 - pulls your transactions from Actual, matches them to the posted orders, and
   writes per-transaction notes back down (honoring `note_mode`);
 - binds to **loopback only** by default and can require a shared token
   (`--bridge-token` / `ASFA_BRIDGE_TOKEN`) sent as the `X-ASFA-Token` header;
 - exposes `GET /health`, `POST /preview` (always dry-run) and `POST /sync`.
+
+**Ports are configurable** (handy when 5006/5007 are taken):
+
+| What | Default | How to change |
+| --- | --- | --- |
+| Bridge port | `5007` | `--port N`, `ASFA_BRIDGE_PORT`, or `[bridge] port` |
+| Bridge host | `127.0.0.1` | `--host` / `[bridge] host` (loopback only) |
+| Actual server URL+port | `http://localhost:5006` | `--actual-url`, `ASFA_ACTUAL_URL`, or `[actual] url` |
+
+If the bridge port is already in use it exits with a clear message telling you to
+pick another with `--port`; just set the same port as the extension's Bridge URL.
 
 > **Running in a container?** The process must listen on `0.0.0.0` inside the
 > container's network namespace for the runtime's published-port mapping to reach

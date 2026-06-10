@@ -238,7 +238,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 port=config.bridge_port,
                 token=config.bridge_token,
             )
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, RuntimeError) as exc:
             print(f"Bridge error: {exc}", file=sys.stderr)
             return 2
         return 0

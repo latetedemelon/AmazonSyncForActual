@@ -74,3 +74,12 @@ def test_memo_options_roundtrip():
     assert opts.separator == " / "
     assert opts.prefix == "P:"
     assert opts.max_items == 2
+
+
+def test_bridge_port_configurable_all_layers(tmp_path, monkeypatch):
+    path = _write(tmp_path, "[bridge]\nport = 6000\nhost = 127.0.0.1\ntoken = sek\n")
+    assert load_config(path).bridge_port == 6000          # from INI
+    assert load_config(path).bridge_token == "sek"
+    monkeypatch.setenv("ASFA_BRIDGE_PORT", "6100")
+    assert load_config(path).bridge_port == 6100          # env over INI
+    assert load_config(path, {"bridge_port": 6200}).bridge_port == 6200  # CLI over env
