@@ -120,9 +120,15 @@ Actual**. The bridge:
 
 - pulls your transactions from Actual, matches them to the posted orders, and
   writes per-transaction notes back down (honoring `note_mode`);
-- binds to **loopback only** and can require a shared token (`--bridge-token` /
-  `ASFA_BRIDGE_TOKEN`) sent as the `X-ASFA-Token` header;
+- binds to **loopback only** by default and can require a shared token
+  (`--bridge-token` / `ASFA_BRIDGE_TOKEN`) sent as the `X-ASFA-Token` header;
 - exposes `GET /health`, `POST /preview` (always dry-run) and `POST /sync`.
+
+> **Running in a container?** The process must listen on `0.0.0.0` inside the
+> container's network namespace for the runtime's published-port mapping to reach
+> it. Set `ASFA_BRIDGE_HOST=0.0.0.0` **and** `ASFA_BRIDGE_ALLOW_REMOTE=1` to opt out
+> of the loopback-only guard. Only do this when a firewall or container boundary
+> controls access, and keep a bridge token set.
 
 ### Diagnostics
 

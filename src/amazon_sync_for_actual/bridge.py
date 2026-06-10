@@ -16,10 +16,11 @@ Request body: ``{"orders": [...], "options": {...}}`` where ``options`` may
 override ``note_mode``, ``days``, ``date_window_days``, ``tolerance_cents``,
 ``account``, ``payee_regex`` and ``include_positive`` for that call.
 
-Security: binds to loopback only; an optional shared token (``--bridge-token`` /
-``ASFA_BRIDGE_TOKEN``) is required via the ``X-ASFA-Token`` header when set; and
-the ``Origin`` is checked against an allow-list (browser extensions by default)
-to reduce DNS-rebinding / cross-site risk.
+Security: binds to loopback only (set ``ASFA_BRIDGE_ALLOW_REMOTE=1`` to allow a
+non-loopback host, e.g. ``0.0.0.0`` inside a container); an optional shared token
+(``--bridge-token`` / ``ASFA_BRIDGE_TOKEN``) is required via the ``X-ASFA-Token``
+header when set; and the ``Origin`` is checked against an allow-list (browser
+extensions by default) to reduce DNS-rebinding / cross-site risk.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from .actual_sync import ActualSyncer, SyncResult, Update
@@ -203,13 +205,24 @@ def run_server(
     token: Optional[str] = None,
     origin_prefixes: Tuple[str, ...] = DEFAULT_ALLOWED_ORIGIN_PREFIXES,
 ) -> None:
-    """Run the bridge until interrupted. Refuses to bind to non-loopback hosts."""
+    """Run the bridge until interrupted.
+
+    Refuses to bind to non-loopback hosts unless ``ASFA_BRIDGE_ALLOW_REMOTE`` is
+    set to a truthy value. The override exists for containerized deploys, where the
+    process must listen on ``0.0.0.0`` inside its own network namespace so the
+    runtime's published-port mapping can forward to it; in that setup the only
+    ingress is the explicit, token-gated published port. Leave it unset on a host.
+    """
     from http.server import ThreadingHTTPServer
 
-    if host not in ("127.0.0.1", "localhost", "::1"):
+    allow_remote = os.environ.get("ASFA_BRIDGE_ALLOW_REMOTE", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+    if host not in ("127.0.0.1", "localhost", "::1") and not allow_remote:
         raise ValueError(
             f"Refusing to bind the bridge to {host!r}; loopback only "
-            "(127.0.0.1/localhost) for safety."
+            "(127.0.0.1/localhost) for safety. Set ASFA_BRIDGE_ALLOW_REMOTE=1 to "
+            "override (only when a firewall or container boundary controls access)."
         )
 
     handler = _make_handler(config, token, origin_prefixes)
