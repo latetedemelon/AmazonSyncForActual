@@ -146,6 +146,36 @@ def test_unknown_route(server):
     assert status == 404
 
 
-def test_run_server_refuses_non_loopback():
+def test_run_server_refuses_non_loopback(monkeypatch):
+    monkeypatch.delenv("ASFA_BRIDGE_ALLOW_REMOTE", raising=False)
+    with pytest.raises(ValueError):
+        bridge.run_server(Config(), host="0.0.0.0")
+
+
+def test_run_server_allows_non_loopback_with_env(monkeypatch):
+    """ASFA_BRIDGE_ALLOW_REMOTE=1 opts in to a non-loopback bind (e.g. 0.0.0.0 in a container)."""
+    import http.server
+
+    monkeypatch.setenv("ASFA_BRIDGE_ALLOW_REMOTE", "1")
+    bound = {}
+
+    class _FakeServer:
+        def __init__(self, addr, handler):
+            bound["addr"] = addr
+
+        def serve_forever(self):
+            raise KeyboardInterrupt  # return immediately, as if Ctrl-C
+
+        def server_close(self):
+            bound["closed"] = True
+
+    monkeypatch.setattr(http.server, "ThreadingHTTPServer", _FakeServer)
+    bridge.run_server(Config(actual_url="http://x"), host="0.0.0.0", port=5007)
+    assert bound["addr"] == ("0.0.0.0", 5007)
+
+
+def test_run_server_env_must_be_truthy(monkeypatch):
+    """A falsy ASFA_BRIDGE_ALLOW_REMOTE value still refuses a non-loopback bind."""
+    monkeypatch.setenv("ASFA_BRIDGE_ALLOW_REMOTE", "0")
     with pytest.raises(ValueError):
         bridge.run_server(Config(), host="0.0.0.0")
